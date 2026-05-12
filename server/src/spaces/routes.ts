@@ -5,12 +5,40 @@ import { Hono } from 'hono';
 import { config } from '../config.js';
 import { CloneError, cloneRepoWithToken } from './clone.js';
 import { parseSpaceInput } from './parse.js';
-import { insertSpace, listSpaces } from './repository.js';
+import {
+  findSpaceById,
+  insertSpace,
+  listSpaces,
+  setFixLoopRunning,
+} from './repository.js';
 import { validateCredentials } from './validators.js';
+import { startWorker, stopWorker } from './worker.js';
 
 export const spacesRouter = new Hono();
 
 spacesRouter.get('/spaces', (c) => c.json(listSpaces()));
+
+spacesRouter.get('/spaces/:id', (c) => {
+  const space = findSpaceById(c.req.param('id'));
+  if (!space) return c.json({ error: 'not found' }, 404);
+  return c.json(space);
+});
+
+spacesRouter.post('/spaces/:id/loop/start', (c) => {
+  const space = findSpaceById(c.req.param('id'));
+  if (!space) return c.json({ error: 'not found' }, 404);
+  setFixLoopRunning(space.id, true);
+  startWorker({ ...space, fixLoopRunning: true });
+  return c.json({ ...space, fixLoopRunning: true });
+});
+
+spacesRouter.post('/spaces/:id/loop/stop', (c) => {
+  const space = findSpaceById(c.req.param('id'));
+  if (!space) return c.json({ error: 'not found' }, 404);
+  setFixLoopRunning(space.id, false);
+  stopWorker(space.id);
+  return c.json({ ...space, fixLoopRunning: false });
+});
 
 spacesRouter.post('/spaces', async (c) => {
   const signal = c.req.raw.signal;

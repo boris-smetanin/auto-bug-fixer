@@ -70,3 +70,14 @@ export function findSpaceById(id: string): Space | undefined {
     .get(id) as SpaceRow | undefined;
   return row ? rowToSpace(row) : undefined;
 }
+
+export function setFixLoopRunning(id: string, running: boolean): void {
+  getDb()
+    .prepare(
+      `UPDATE spaces
+       SET fix_loop_running = ?,
+           updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+       WHERE id = ?`,
+    )
+    .run(running ? 1 : 0, id);
+}

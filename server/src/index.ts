@@ -4,10 +4,14 @@ import { cors } from 'hono/cors';
 import type { HealthResponse } from '@abf/shared';
 import { config } from './config.js';
 import { closeDb, initDb } from './db.js';
+import { closeAppLogger, initAppLogger, logEvent } from './logger.js';
 import { spacesRouter } from './spaces/routes.js';
+import { resumeRunningSpaces, stopAllWorkers } from './spaces/worker.js';
 import { staticHandler } from './static.js';
 
 initDb({ dataDir: config.dataDir, migrationsPath: config.migrationsPath });
+initAppLogger(config.logsDir);
+resumeRunningSpaces();
 
 const app = new Hono();
 
@@ -28,9 +32,11 @@ server.requestTimeout = 10 * 60 * 1000;
 server.headersTimeout = 11 * 60 * 1000;
 
 const shutdown = (signal: string): void => {
-  console.log(`received ${signal}, shutting down`);
+  logEvent({ src: 'orchestrator', msg: `received ${signal}, shutting down` });
+  stopAllWorkers();
   server.close(() => {
     closeDb();
+    closeAppLogger();
     process.exit(0);
   });
   setTimeout(() => {
