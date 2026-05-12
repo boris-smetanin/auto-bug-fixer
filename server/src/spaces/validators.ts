@@ -1,6 +1,6 @@
 import type { SpaceInput, ValidationErrors } from '@abf/shared';
 
-const GITHUB_API = 'https://api.github.com';
+const GITHUB_API = process.env.GITHUB_API_BASE ?? 'https://api.github.com';
 
 type AbortableInit = RequestInit & { signal?: AbortSignal };
 

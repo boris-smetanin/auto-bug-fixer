@@ -1,4 +1,4 @@
-import type { Space, SpaceInput, ValidationErrors } from '@abf/shared';
+import type { FixAttempt, Space, SpaceInput, ValidationErrors } from '@abf/shared';
 
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? '';
 
@@ -28,6 +28,12 @@ export async function stopFixLoop(id: string): Promise<Space> {
   const res = await fetch(apiUrl(`/api/spaces/${id}/loop/stop`), { method: 'POST' });
   if (!res.ok) throw new Error(`stop loop failed: ${res.status}`);
   return res.json() as Promise<Space>;
+}
+
+export async function listFixAttempts(spaceId: string): Promise<FixAttempt[]> {
+  const res = await fetch(apiUrl(`/api/spaces/${spaceId}/fix-attempts`));
+  if (!res.ok) throw new Error(`list fix attempts failed: ${res.status}`);
+  return res.json() as Promise<FixAttempt[]>;
 }
 
 export type CreateSpaceResult =

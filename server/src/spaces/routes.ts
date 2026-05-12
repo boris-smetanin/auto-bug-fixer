@@ -4,6 +4,7 @@ import path from 'node:path';
 import { Hono } from 'hono';
 import { config } from '../config.js';
 import { CloneError, cloneRepoWithToken } from './clone.js';
+import { listFixAttemptsBySpace } from './fix-attempts.js';
 import { parseSpaceInput } from './parse.js';
 import {
   findSpaceById,
@@ -22,6 +23,12 @@ spacesRouter.get('/spaces/:id', (c) => {
   const space = findSpaceById(c.req.param('id'));
   if (!space) return c.json({ error: 'not found' }, 404);
   return c.json(space);
+});
+
+spacesRouter.get('/spaces/:id/fix-attempts', (c) => {
+  const space = findSpaceById(c.req.param('id'));
+  if (!space) return c.json({ error: 'not found' }, 404);
+  return c.json(listFixAttemptsBySpace(space.id));
 });
 
 spacesRouter.post('/spaces/:id/loop/start', (c) => {
