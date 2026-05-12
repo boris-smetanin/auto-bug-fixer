@@ -1,0 +1,3 @@
+# Local-first, Dockerized deployment
+
+The app is a single-user tool that watches Sentry and opens fix PRs. We considered a native binary (simplest distribution, no Docker overhead), a SaaS-style hosted service (multi-user from day 1), and local-first packaged as a Docker container. We chose **local-first Dockerized** because the Docker packaging gives us a portable runtime that can be lifted to a server later without code changes, while SaaS would force auth/multi-tenancy/secret-mgmt complexity we don't need yet, and a native binary would lose the deploy-anywhere escape hatch. State lives in a mounted `/data` volume (SQLite + clones + logs) so a future server deployment is purely a volume-move.
