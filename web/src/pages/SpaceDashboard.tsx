@@ -1,18 +1,27 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import type { Space } from '@abf/shared';
+import type { FixAttempt, Space } from '@abf/shared';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { FixAttemptStatePill } from '@/components/ui/fix-attempt-state-pill';
 import { StatusPill } from '@/components/ui/status-pill';
-import { getSpace, startFixLoop, stopFixLoop } from '@/lib/api';
+import {
+  getSpace,
+  listFixAttempts,
+  startFixLoop,
+  stopFixLoop,
+} from '@/lib/api';
+
+const ATTEMPT_POLL_MS = 5000;
 
 export function SpaceDashboard() {
   const { id = '' } = useParams<{ id: string }>();
   const [space, setSpace] = useState<Space | null>(null);
+  const [attempts, setAttempts] = useState<FixAttempt[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const load = useCallback(async () => {
+  const loadSpace = useCallback(async () => {
     try {
       const s = await getSpace(id);
       setSpace(s);
@@ -22,9 +31,24 @@ export function SpaceDashboard() {
     }
   }, [id]);
 
+  const loadAttempts = useCallback(async () => {
+    try {
+      const rows = await listFixAttempts(id);
+      setAttempts(rows);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }, [id]);
+
   useEffect(() => {
-    void load();
-  }, [load]);
+    void loadSpace();
+    void loadAttempts();
+    const t = setInterval(() => {
+      void loadAttempts();
+      void loadSpace();
+    }, ATTEMPT_POLL_MS);
+    return () => clearInterval(t);
+  }, [loadSpace, loadAttempts]);
 
   const toggleLoop = async () => {
     if (!space) return;
@@ -34,6 +58,7 @@ export function SpaceDashboard() {
         ? await stopFixLoop(space.id)
         : await startFixLoop(space.id);
       setSpace(updated);
+      void loadAttempts();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -41,7 +66,7 @@ export function SpaceDashboard() {
     }
   };
 
-  if (error) {
+  if (error && !space) {
     return (
       <main className="mx-auto max-w-3xl p-8">
         <div className="mb-6">
@@ -104,14 +129,7 @@ export function SpaceDashboard() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Fix Attempts</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-neutral-500">Coming in the next slice.</p>
-        </CardContent>
-      </Card>
+      <FixAttemptsCard space={space} attempts={attempts} />
 
       <Card>
         <CardHeader>
@@ -122,5 +140,71 @@ export function SpaceDashboard() {
         </CardContent>
       </Card>
     </main>
+  );
+}
+
+function FixAttemptsCard({
+  space,
+  attempts,
+}: {
+  space: Space;
+  attempts: FixAttempt[] | null;
+}) {
+  const sentryIssueLink = (issueId: string) =>
+    `${space.sentryBaseUrl}/organizations/${space.sentryOrgSlug}/issues/${issueId}/`;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Fix Attempts</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {attempts === null && <p className="text-sm text-neutral-500">Loading…</p>}
+        {attempts?.length === 0 && (
+          <p className="text-sm text-neutral-500">
+            {space.fixLoopRunning
+              ? 'Fix Loop is running. Waiting for Sentry issues…'
+              : 'Fix Loop is stopped. Start it to begin watching Sentry.'}
+          </p>
+        )}
+        {attempts && attempts.length > 0 && (
+          <table className="w-full text-sm">
+            <thead className="border-b border-neutral-200 dark:border-neutral-800">
+              <tr className="text-left">
+                <th className="py-2 pr-4 font-medium">State</th>
+                <th className="py-2 pr-4 font-medium">Sentry Issue</th>
+                <th className="py-2 pr-4 font-medium">Branch</th>
+                <th className="py-2 pr-4 font-medium">Created</th>
+              </tr>
+            </thead>
+            <tbody>
+              {attempts.map((a) => (
+                <tr key={a.id} className="border-b border-neutral-100 last:border-0 dark:border-neutral-800">
+                  <td className="py-2 pr-4">
+                    <FixAttemptStatePill state={a.state} />
+                  </td>
+                  <td className="py-2 pr-4">
+                    <a
+                      href={sentryIssueLink(a.sentryIssueId)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-neutral-700 hover:underline dark:text-neutral-300"
+                    >
+                      #{a.sentryIssueId}
+                    </a>
+                  </td>
+                  <td className="py-2 pr-4 text-neutral-600 dark:text-neutral-400 font-mono text-xs">
+                    {a.branchName}
+                  </td>
+                  <td className="py-2 pr-4 text-neutral-600 dark:text-neutral-400">
+                    {new Date(a.createdAt).toLocaleString()}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </CardContent>
+    </Card>
   );
 }
