@@ -12,6 +12,24 @@ export async function listSpaces(): Promise<Space[]> {
   return res.json() as Promise<Space[]>;
 }
 
+export async function getSpace(id: string): Promise<Space> {
+  const res = await fetch(apiUrl(`/api/spaces/${id}`));
+  if (!res.ok) throw new Error(`GET /api/spaces/${id} failed: ${res.status}`);
+  return res.json() as Promise<Space>;
+}
+
+export async function startFixLoop(id: string): Promise<Space> {
+  const res = await fetch(apiUrl(`/api/spaces/${id}/loop/start`), { method: 'POST' });
+  if (!res.ok) throw new Error(`start loop failed: ${res.status}`);
+  return res.json() as Promise<Space>;
+}
+
+export async function stopFixLoop(id: string): Promise<Space> {
+  const res = await fetch(apiUrl(`/api/spaces/${id}/loop/stop`), { method: 'POST' });
+  if (!res.ok) throw new Error(`stop loop failed: ${res.status}`);
+  return res.json() as Promise<Space>;
+}
+
 export type CreateSpaceResult =
   | { ok: true; space: Space }
   | { ok: false; errors: ValidationErrors };

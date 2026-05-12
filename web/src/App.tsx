@@ -1,5 +1,6 @@
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { AddSpace } from '@/pages/AddSpace';
+import { SpaceDashboard } from '@/pages/SpaceDashboard';
 import { SpacesList } from '@/pages/SpacesList';
 
 export function App() {
@@ -9,6 +10,7 @@ export function App() {
         <Routes>
           <Route path="/" element={<SpacesList />} />
           <Route path="/spaces/new" element={<AddSpace />} />
+          <Route path="/spaces/:id" element={<SpaceDashboard />} />
         </Routes>
       </div>
     </BrowserRouter>
