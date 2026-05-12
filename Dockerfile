@@ -22,7 +22,7 @@ ENV NODE_ENV=production \
     DATA_DIR=/data \
     CORS_ORIGIN=*
 RUN apt-get update \
- && apt-get install -y --no-install-recommends ca-certificates curl \
+ && apt-get install -y --no-install-recommends ca-certificates curl git \
  && rm -rf /var/lib/apt/lists/* \
  && mkdir -p /data
 COPY --from=build /app/package.json ./
