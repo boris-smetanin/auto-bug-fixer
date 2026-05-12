@@ -60,6 +60,7 @@ The single-process design is convenient now but doesn't lock us into it. Keeping
 | `githubRepo` | string | e.g. `api` |
 | `githubToken` | string | Fine-grained PAT, plaintext (v1) |
 | `baseBranch` | string | User-specified; e.g. `main` |
+| `sentryBaseUrl` | string | Default `https://sentry.io`; override for self-hosted |
 | `sentryOrgSlug` | string | |
 | `sentryProjectSlug` | string | |
 | `sentryAuthToken` | string | Plaintext (v1) |
@@ -271,6 +272,7 @@ No `cancelled` state — soft-stop and orphan recovery both land in existing sta
 | `githubRepo` | yes | — |
 | `githubToken` | yes (masked) | — |
 | `baseBranch` | yes | `main` |
+| `sentryBaseUrl` | no | `https://sentry.io` |
 | `sentryOrgSlug` | yes | — |
 | `sentryProjectSlug` | yes | — |
 | `sentryAuthToken` | yes (masked) | — |
@@ -278,12 +280,11 @@ No `cancelled` state — soft-stop and orphan recovery both land in existing sta
 | `tickIntervalSeconds` | no | `60` |
 
 ### Save flow
-1. **Validate** (5 API checks, fail-fast):
+1. **Validate** (4 API checks, fail-fast):
    - GitHub repo accessible with token.
    - GitHub token has `Contents: Read` (list branches).
    - Base branch exists.
-   - Sentry project accessible with token.
-   - Sentry token can read issues.
+   - Sentry token can read issues for `{org}/{project}` (subsumes "org exists", "project exists", and "token has `event:read` scope"). We deliberately do **not** validate `/projects/{org}/{project}/` separately — that would require `project:read`, which the Fix Loop never actually uses.
 2. **Eager clone** synchronously into `/data/cloned_repos/{spaceId}/`.
 3. **Persist** Space row.
 

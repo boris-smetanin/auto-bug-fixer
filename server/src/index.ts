@@ -4,6 +4,7 @@ import { cors } from 'hono/cors';
 import type { HealthResponse } from '@abf/shared';
 import { config } from './config.js';
 import { closeDb, initDb } from './db.js';
+import { spacesRouter } from './spaces/routes.js';
 import { staticHandler } from './static.js';
 
 initDb({ dataDir: config.dataDir, migrationsPath: config.migrationsPath });
@@ -14,11 +15,17 @@ app.use('*', cors({ origin: config.corsOrigin }));
 
 app.get('/healthz', (c) => c.json<HealthResponse>({ ok: true }));
 
+app.route('/api', spacesRouter);
+
 app.get('*', staticHandler(config.webDistPath));
 
 const server = serve({ fetch: app.fetch, port: config.port }, (info) => {
   console.log(`server listening on http://localhost:${info.port}`);
 });
+
+// 10-minute request timeout per slice #2 (allows long-running eager clones)
+server.requestTimeout = 10 * 60 * 1000;
+server.headersTimeout = 11 * 60 * 1000;
 
 const shutdown = (signal: string): void => {
   console.log(`received ${signal}, shutting down`);
