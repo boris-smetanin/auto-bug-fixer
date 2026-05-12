@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { Eye, Play, Square } from 'lucide-react';
 import type { Space } from '@abf/shared';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatusPill } from '@/components/ui/status-pill';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { listSpaces, startFixLoop, stopFixLoop } from '@/lib/api';
 
 export function SpacesList() {
+  const navigate = useNavigate();
   const [spaces, setSpaces] = useState<Space[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyIds, setBusyIds] = useState<Set<string>>(new Set());
@@ -62,7 +65,9 @@ export function SpacesList() {
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-semibold tracking-tight">Spaces</h1>
         <Link to="/spaces/new">
-          <Button>Add Space</Button>
+          <Button className="bg-emerald-600 text-white hover:bg-emerald-500 dark:bg-emerald-500 dark:text-white dark:hover:bg-emerald-400">
+            Add Space
+          </Button>
         </Link>
       </div>
 
@@ -86,7 +91,9 @@ export function SpacesList() {
               Add your first Space to start watching a GitHub repo for Sentry Issues.
             </p>
             <Link to="/spaces/new">
-              <Button>Add your first Space</Button>
+              <Button className="bg-emerald-600 text-white hover:bg-emerald-500 dark:bg-emerald-500 dark:text-white dark:hover:bg-emerald-400">
+                Add your first Space
+              </Button>
             </Link>
           </CardContent>
         </Card>
@@ -102,12 +109,13 @@ export function SpacesList() {
                 <th className="p-4 font-medium">Base branch</th>
                 <th className="p-4 font-medium">Tick</th>
                 <th className="p-4 font-medium">Status</th>
-                <th className="p-4 font-medium text-right">Loop</th>
+                <th className="p-4 font-medium text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
               {spaces.map((s) => {
                 const busy = busyIds.has(s.id);
+                const loopLabel = s.fixLoopRunning ? 'Stop Fix Loop' : 'Start Fix Loop';
                 return (
                   <tr
                     key={s.id}
@@ -131,15 +139,41 @@ export function SpacesList() {
                     <td className="p-4">
                       <StatusPill status={s.fixLoopRunning ? 'running' : 'stopped'} />
                     </td>
-                    <td className="p-4 text-right">
-                      <Button
-                        size="sm"
-                        variant={s.fixLoopRunning ? 'outline' : 'default'}
-                        disabled={busy}
-                        onClick={() => void toggleLoop(s)}
-                      >
-                        {busy ? '…' : s.fixLoopRunning ? 'Stop' : 'Start'}
-                      </Button>
+                    <td className="p-4">
+                      <div className="flex items-center justify-end gap-1">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              disabled={busy}
+                              aria-label={loopLabel}
+                              onClick={() => void toggleLoop(s)}
+                            >
+                              {s.fixLoopRunning ? (
+                                <Square className="h-4 w-4 fill-current text-red-600 dark:text-red-400" />
+                              ) : (
+                                <Play className="h-4 w-4 fill-current text-emerald-600 dark:text-emerald-400" />
+                              )}
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>{loopLabel}</TooltipContent>
+                        </Tooltip>
+
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              aria-label="View live logs"
+                              onClick={() => navigate(`/spaces/${s.id}`)}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>View live logs</TooltipContent>
+                        </Tooltip>
+                      </div>
                     </td>
                   </tr>
                 );
