@@ -1,0 +1,26 @@
+# Default local-dev configuration.
+#
+# Bind-mounts ./data on the host so SQLite (`app.db`), clones
+# (`cloned_repos/`), and log files (`logs/`) are visible to the host —
+# readable in TablePlus, `tail -f`, your editor — even when the container
+# is stopped or Docker Desktop is down.
+#
+# Usage:
+#   cp .env.example .env       # fill in ANTHROPIC_API_KEY
+#   docker compose up -d --build
+#   docker compose logs -f auto-bug-fixer
+#   docker compose down
+
+services:
+  auto-bug-fixer:
+    build: .
+    image: auto-bug-fixer:dev
+    container_name: auto-bug-fixer
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/data
+    env_file:
+      - path: .env
+        required: false
+    restart: unless-stopped
