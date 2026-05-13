@@ -17,7 +17,7 @@ services:
     image: auto-bug-fixer:dev
     container_name: auto-bug-fixer
     ports:
-      - "3000:3000"
+      - "${PORT:-3000}:${PORT:-3000}"
     volumes:
       - ./data:/data
     env_file:
