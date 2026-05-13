@@ -41,3 +41,44 @@ export async function remoteBranchExists(
 export function fixBranchName(sentryIssueId: string): string {
   return `auto-fix/sentry-${sentryIssueId}`;
 }
+
+export type PullRequestCreated = {
+  number: number;
+  htmlUrl: string;
+};
+
+export async function createPullRequest(
+  space: Space,
+  args: { title: string; body: string; head: string; base: string },
+  signal?: AbortSignal,
+): Promise<PullRequestCreated> {
+  const url = `${GITHUB_API}/repos/${space.githubOwner}/${space.githubRepo}/pulls`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${space.githubToken}`,
+      Accept: 'application/vnd.github+json',
+      'User-Agent': 'auto-bug-fixer',
+      'X-GitHub-Api-Version': '2022-11-28',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      title: args.title,
+      body: args.body,
+      head: args.head,
+      base: args.base,
+      maintainer_can_modify: true,
+    }),
+    signal,
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new GithubApiError(
+      `GitHub ${res.status} creating PR`,
+      res.status,
+      body.slice(0, 500),
+    );
+  }
+  const data = (await res.json()) as { number: number; html_url: string };
+  return { number: data.number, htmlUrl: data.html_url };
+}

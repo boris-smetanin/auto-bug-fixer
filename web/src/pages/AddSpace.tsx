@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { Info } from 'lucide-react';
 import type { SpaceInput, ValidationErrors } from '@abf/shared';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { createSpace } from '@/lib/api';
 import { parseGithubRepoText } from '@/lib/github';
 
@@ -173,7 +175,29 @@ export function AddSpace() {
             <Field
               label="GitHub fine-grained PAT"
               error={errors.githubToken}
-              hint="Needs Contents: R/W, Pull Requests: R/W, Metadata: R."
+              hint="Fine-grained PAT scoped to this single repo with read+write."
+              info={
+                <div className="space-y-1.5">
+                  <p className="font-medium">Required permissions for this repo:</p>
+                  <ul className="list-disc pl-4 space-y-0.5">
+                    <li>
+                      <strong>Contents</strong>: Read and write
+                      <span className="text-neutral-400"> — clone, push fix branch</span>
+                    </li>
+                    <li>
+                      <strong>Pull requests</strong>: Read and write
+                      <span className="text-neutral-400"> — open the fix PR</span>
+                    </li>
+                    <li>
+                      <strong>Metadata</strong>: Read-only
+                      <span className="text-neutral-400"> — auto-included with other repo perms</span>
+                    </li>
+                  </ul>
+                  <p className="text-neutral-400">
+                    Create at github.com/settings/tokens?type=beta
+                  </p>
+                </div>
+              }
             >
               <Input
                 type="password"
@@ -233,7 +257,21 @@ export function AddSpace() {
             <Field
               label="Sentry auth token"
               error={errors.sentryAuthToken}
-              hint="Needs event:read + project:read."
+              hint="Needs the event:read scope to fetch unresolved issues + events."
+              info={
+                <div className="space-y-1.5">
+                  <p className="font-medium">Required scope:</p>
+                  <ul className="list-disc pl-4 space-y-0.5">
+                    <li>
+                      <strong>event:read</strong>
+                      <span className="text-neutral-400"> — fetch issues + latest event payload</span>
+                    </li>
+                  </ul>
+                  <p className="text-neutral-400">
+                    Generate at: Settings → Account → API → Auth Tokens
+                  </p>
+                </div>
+              }
             >
               <Input
                 type="password"
@@ -306,16 +344,36 @@ function Field({
   label,
   hint,
   error,
+  info,
   children,
 }: {
   label: string;
   hint?: string;
   error?: string;
+  info?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
     <div className="space-y-1.5">
-      <Label>{label}</Label>
+      <div className="flex items-center gap-1.5">
+        <Label>{label}</Label>
+        {info && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                aria-label="More info"
+                className="inline-flex cursor-help text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300"
+              >
+                <Info className="h-3.5 w-3.5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-xs text-left text-[11px] leading-snug">
+              {info}
+            </TooltipContent>
+          </Tooltip>
+        )}
+      </div>
       {children}
       {hint && !error && (
         <p className="text-xs text-neutral-500">{hint}</p>

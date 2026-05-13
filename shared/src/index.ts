@@ -43,7 +43,6 @@ export type AddSpaceErrorResponse = {
 export type FixAttemptState =
   | 'queued'
   | 'in_progress'
-  | 'local_commit'
   | 'pr_opened'
   | 'failed';
 

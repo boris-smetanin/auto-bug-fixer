@@ -147,6 +147,40 @@ export async function gitDeleteLocalBranchIfExists(
   }
 }
 
+export async function gitPush(
+  cwd: string,
+  remote: string,
+  branch: string,
+  token: string,
+  signal?: AbortSignal,
+): Promise<void> {
+  await runGit({ cwd, args: ['push', remote, branch], token, signal });
+}
+
+export async function gitReadHeadMessage(
+  cwd: string,
+  signal?: AbortSignal,
+): Promise<string> {
+  const { stdout } = await runGit({
+    cwd,
+    args: ['log', '-1', '--format=%B'],
+    signal,
+  });
+  return stdout.replace(/\n+$/, '');
+}
+
+export async function gitAmendCommitMessage(
+  cwd: string,
+  message: string,
+  signal?: AbortSignal,
+): Promise<void> {
+  await runGit({
+    cwd,
+    args: ['commit', '--amend', '--no-edit', '-m', message],
+    signal,
+  });
+}
+
 export async function gitCommitsSinceBase(
   cwd: string,
   baseBranch: string,

@@ -12,11 +12,6 @@ const styles: Record<FixAttemptState, { bg: string; dot: string; label: string }
     dot: 'bg-blue-500 animate-pulse',
     label: 'in progress',
   },
-  local_commit: {
-    bg: 'bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300',
-    dot: 'bg-violet-500',
-    label: 'local commit',
-  },
   pr_opened: {
     bg: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300',
     dot: 'bg-emerald-500',

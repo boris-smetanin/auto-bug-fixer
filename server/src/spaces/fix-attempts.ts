@@ -110,12 +110,21 @@ export function claimNextQueuedForSpace(spaceId: string): FixAttempt | undefined
   return claimed ? rowToAttempt(claimed) : undefined;
 }
 
-export function markFixAttemptLocalCommit(id: string): void {
+export function markFixAttemptPrOpened(
+  id: string,
+  prNumber: number,
+  prUrl: string,
+): void {
   getDb()
     .prepare(
-      "UPDATE fix_attempts SET state = 'local_commit', ended_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?",
+      `UPDATE fix_attempts
+       SET state = 'pr_opened',
+           pr_number = ?,
+           pr_url = ?,
+           ended_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+       WHERE id = ?`,
     )
-    .run(id);
+    .run(prNumber, prUrl, id);
 }
 
 export function markFixAttemptFailed(
