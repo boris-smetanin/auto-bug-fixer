@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { FixAttemptStatePill } from '@/components/ui/fix-attempt-state-pill';
 import { StatusPill } from '@/components/ui/status-pill';
+import { LiveLogsPanel } from '@/components/LiveLogsPanel';
 import {
   getSpace,
   listFixAttempts,
@@ -85,14 +86,14 @@ export function SpaceDashboard() {
 
   if (!space) {
     return (
-      <main className="mx-auto max-w-3xl p-8">
+      <main className="mx-auto p-8">
         <p className="text-neutral-500">Loading…</p>
       </main>
     );
   }
 
   return (
-    <main className="mx-auto max-w-3xl p-8 space-y-6">
+    <main className="mx-auto p-8 space-y-6">
       <div>
         <Link to="/" className="text-sm text-neutral-500 hover:underline">
           ← Back to Spaces
@@ -131,14 +132,7 @@ export function SpaceDashboard() {
 
       <FixAttemptsCard space={space} attempts={attempts} />
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Live Logs</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-neutral-500">Coming in the live-logs slice.</p>
-        </CardContent>
-      </Card>
+      <LiveLogsPanel spaceId={space.id} />
     </main>
   );
 }

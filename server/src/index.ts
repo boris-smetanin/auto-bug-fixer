@@ -5,6 +5,7 @@ import type { HealthResponse } from '@abf/shared';
 import { config } from './config.js';
 import { closeDb, initDb } from './db.js';
 import { closeAppLogger, initAppLogger, logEvent } from './logger.js';
+import { logsRouter } from './spaces/logs-routes.js';
 import { spacesRouter } from './spaces/routes.js';
 import { resumeRunningSpaces, stopAllWorkers } from './spaces/worker.js';
 import { staticHandler } from './static.js';
@@ -20,6 +21,7 @@ app.use('*', cors({ origin: config.corsOrigin }));
 app.get('/healthz', (c) => c.json<HealthResponse>({ ok: true }));
 
 app.route('/api', spacesRouter);
+app.route('/api', logsRouter);
 
 app.get('*', staticHandler(config.webDistPath));
 
