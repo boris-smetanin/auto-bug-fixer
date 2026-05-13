@@ -40,7 +40,12 @@ export type AddSpaceErrorResponse = {
   errors: ValidationErrors;
 };
 
-export type FixAttemptState = 'queued' | 'in_progress' | 'pr_opened' | 'failed';
+export type FixAttemptState =
+  | 'queued'
+  | 'in_progress'
+  | 'local_commit'
+  | 'pr_opened'
+  | 'failed';
 
 export type FixAttempt = {
   id: string;
