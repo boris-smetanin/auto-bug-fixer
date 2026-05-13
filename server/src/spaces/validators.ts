@@ -43,7 +43,7 @@ export async function validateCredentials(
   const baseBranch = input.baseBranch ?? 'main';
   const sentryBaseUrl = input.sentryBaseUrl ?? 'https://sentry.io';
 
-  // 1. GitHub repo accessible
+  // 1. GitHub repo accessible + parse permissions object to verify Contents:Write
   const repoRes = await ghFetch(
     `/repos/${input.githubOwner}/${input.githubRepo}`,
     input.githubToken,
@@ -59,7 +59,23 @@ export async function validateCredentials(
     return { githubRepo: `GitHub returned ${repoRes.status} when checking repo` };
   }
 
-  // 2. Token has Contents: Read — list branches as a proxy
+  const repoData = (await repoRes.json()) as {
+    permissions?: { admin?: boolean; push?: boolean; pull?: boolean };
+  };
+
+  // Token must have push (Contents: Write) for the Fix Attempt to push the fix branch.
+  // GitHub returns a `permissions` object on /repos/{owner}/{repo} reflecting the
+  // authenticating token's capabilities.
+  if (repoData.permissions && repoData.permissions.push !== true) {
+    return {
+      githubToken:
+        'GitHub token missing `Contents: Read and write` permission for this repo. ' +
+        'Edit the token at github.com/settings/tokens?type=beta and grant Contents R/W.',
+    };
+  }
+
+  // 2. Token has Contents: Read — list branches as a proxy (catches the case where
+  // permissions object isn't returned, e.g. classic PATs)
   const branchesRes = await ghFetch(
     `/repos/${input.githubOwner}/${input.githubRepo}/branches?per_page=1`,
     input.githubToken,

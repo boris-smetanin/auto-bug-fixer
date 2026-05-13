@@ -174,6 +174,7 @@ function FixAttemptsCard({
                 <th className="py-2 pr-4 font-medium">State</th>
                 <th className="py-2 pr-4 font-medium">Sentry Issue</th>
                 <th className="py-2 pr-4 font-medium">Branch</th>
+                <th className="py-2 pr-4 font-medium">PR</th>
                 <th className="py-2 pr-4 font-medium">Created</th>
               </tr>
             </thead>
@@ -195,6 +196,20 @@ function FixAttemptsCard({
                   </td>
                   <td className="py-2 pr-4 text-neutral-600 dark:text-neutral-400 font-mono text-xs">
                     {a.branchName}
+                  </td>
+                  <td className="py-2 pr-4">
+                    {a.prNumber && a.prUrl ? (
+                      <a
+                        href={a.prUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-emerald-700 hover:underline dark:text-emerald-400"
+                      >
+                        #{a.prNumber}
+                      </a>
+                    ) : (
+                      <span className="text-neutral-400">—</span>
+                    )}
                   </td>
                   <td className="py-2 pr-4 text-neutral-600 dark:text-neutral-400">
                     {new Date(a.createdAt).toLocaleString()}

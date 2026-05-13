@@ -5,24 +5,34 @@ import { createAttemptLog } from './attempt-log.js';
 import { ClaudeRunError, runClaudeFix } from './claude-runner.js';
 import {
   markFixAttemptFailed,
-  markFixAttemptLocalCommit,
+  markFixAttemptPrOpened,
 } from './fix-attempts.js';
 import {
   GitError,
+  gitAmendCommitMessage,
   gitCheckout,
   gitCommitsSinceBase,
   gitCreateBranch,
   gitDeleteLocalBranchIfExists,
   gitFetch,
-  gitPull,
+  gitPush,
+  gitReadHeadMessage,
   gitResetHard,
 } from './git.js';
+import {
+  GithubApiError,
+  createPullRequest,
+} from './github.js';
+import { formatPullRequestBody, formatPullRequestTitle } from './pr-body.js';
 import {
   SentryApiError,
   fetchLatestEventForIssue,
   fetchUnresolvedSentryIssues,
 } from './sentry.js';
 import { formatSentryPayload } from './sentry-payload.js';
+
+const COMMIT_MESSAGE_PREFIX = (sentryIssueId: string): string =>
+  `auto-fix(sentry-${sentryIssueId}): `;
 
 export async function drainFixAttempt(
   space: Space,
@@ -98,12 +108,42 @@ export async function drainFixAttempt(
         'Claude exited without producing commits',
       );
       log.log('warn', 'orchestrator', 'fix attempt failed: no_changes_produced');
+      // Clean up the empty fix branch so a future retry starts fresh.
+      await gitCheckout(cloneDir, space.baseBranch).catch(() => undefined);
+      await gitDeleteLocalBranchIfExists(cloneDir, attempt.branchName);
       return;
     }
 
-    markFixAttemptLocalCommit(attempt.id);
-    log.log('info', 'orchestrator', 'fix attempt complete (local_commit)', {
-      commitCount: commits.length,
+    // Prefix the most recent commit message with auto-fix(sentry-{id}):
+    const prefix = COMMIT_MESSAGE_PREFIX(attempt.sentryIssueId);
+    const headMessage = await gitReadHeadMessage(cloneDir);
+    if (!headMessage.startsWith(prefix)) {
+      log.log('info', 'orchestrator', 'amending commit with prefix', { prefix });
+      await gitAmendCommitMessage(cloneDir, `${prefix}${headMessage}`);
+    }
+
+    log.log('info', 'orchestrator', 'pushing fix branch', {
+      branch: attempt.branchName,
+    });
+    await gitPush(cloneDir, 'origin', attempt.branchName, space.githubToken);
+
+    log.log('info', 'orchestrator', 'opening pull request', {
+      base: space.baseBranch,
+      head: attempt.branchName,
+    });
+    const prTitle = formatPullRequestTitle(issue, attempt.sentryIssueId);
+    const prBody = formatPullRequestBody(space, issue, event);
+    const pr = await createPullRequest(space, {
+      title: prTitle,
+      body: prBody,
+      head: attempt.branchName,
+      base: space.baseBranch,
+    });
+
+    markFixAttemptPrOpened(attempt.id, pr.number, pr.htmlUrl);
+    log.log('info', 'orchestrator', 'fix attempt complete (pr_opened)', {
+      prNumber: pr.number,
+      prUrl: pr.htmlUrl,
     });
   } catch (err) {
     const { reason, message } = classifyError(err);
@@ -123,11 +163,19 @@ function classifyError(err: unknown): { reason: string; message: string } {
   if (err instanceof SentryApiError) {
     return { reason: 'sentry_api_error', message: err.message };
   }
+  if (err instanceof GithubApiError) {
+    // Distinguish PR-creation failures from push failures by inspecting the message.
+    if (err.message.includes('creating PR')) {
+      return { reason: 'pr_creation_error', message: err.message };
+    }
+    return { reason: 'unknown', message: err.message };
+  }
   if (err instanceof GitError) {
-    const args = err.message.split(' ');
-    const op = args[1] ?? '';
+    const parts = err.message.split(' ');
+    const op = parts[1] ?? '';
     if (op === 'clone' || op === 'fetch') return { reason: 'clone_error', message: err.message };
     if (op === 'checkout') return { reason: 'checkout_error', message: err.message };
+    if (op === 'push') return { reason: 'push_error', message: err.message };
     return { reason: 'unknown', message: err.message };
   }
   return {
