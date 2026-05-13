@@ -75,6 +75,24 @@ export function hasInProgressAttempt(spaceId: string): boolean {
   return row !== undefined;
 }
 
+export function findInProgressAttemptForSpace(
+  spaceId: string,
+): FixAttempt | undefined {
+  const row = getDb()
+    .prepare(
+      "SELECT * FROM fix_attempts WHERE space_id = ? AND state = 'in_progress' LIMIT 1",
+    )
+    .get(spaceId) as FixAttemptRow | undefined;
+  return row ? rowToAttempt(row) : undefined;
+}
+
+export function findFixAttemptById(id: string): FixAttempt | undefined {
+  const row = getDb()
+    .prepare('SELECT * FROM fix_attempts WHERE id = ?')
+    .get(id) as FixAttemptRow | undefined;
+  return row ? rowToAttempt(row) : undefined;
+}
+
 export function listFixAttemptsBySpace(spaceId: string, limit = 50): FixAttempt[] {
   const rows = getDb()
     .prepare(
