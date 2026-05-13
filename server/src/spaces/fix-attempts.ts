@@ -83,3 +83,56 @@ export function listFixAttemptsBySpace(spaceId: string, limit = 50): FixAttempt[
     .all(spaceId, limit) as FixAttemptRow[];
   return rows.map(rowToAttempt);
 }
+
+/**
+ * Atomically pick the oldest queued attempt for a Space and transition it to
+ * `in_progress`. Returns the picked attempt, or undefined if none queued.
+ */
+export function claimNextQueuedForSpace(spaceId: string): FixAttempt | undefined {
+  const db = getDb();
+  const tx = db.transaction((): FixAttemptRow | undefined => {
+    const row = db
+      .prepare(
+        "SELECT * FROM fix_attempts WHERE space_id = ? AND state = 'queued' ORDER BY created_at LIMIT 1",
+      )
+      .get(spaceId) as FixAttemptRow | undefined;
+    if (!row) return undefined;
+    db.prepare(
+      "UPDATE fix_attempts SET state = 'in_progress', started_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?",
+    ).run(row.id);
+    return {
+      ...row,
+      state: 'in_progress',
+      started_at: new Date().toISOString(),
+    };
+  });
+  const claimed = tx();
+  return claimed ? rowToAttempt(claimed) : undefined;
+}
+
+export function markFixAttemptLocalCommit(id: string): void {
+  getDb()
+    .prepare(
+      "UPDATE fix_attempts SET state = 'local_commit', ended_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?",
+    )
+    .run(id);
+}
+
+export function markFixAttemptFailed(
+  id: string,
+  reason: string,
+  message: string,
+  context?: unknown,
+): void {
+  getDb()
+    .prepare(
+      `UPDATE fix_attempts
+       SET state = 'failed',
+           failure_reason = ?,
+           failure_message = ?,
+           failure_context = ?,
+           ended_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+       WHERE id = ?`,
+    )
+    .run(reason, message, context ? JSON.stringify(context) : null, id);
+}

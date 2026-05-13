@@ -7,6 +7,38 @@ export type SentryIssue = {
   permalink: string;
   firstSeen: string;
   lastSeen: string;
+  count: string;
+};
+
+export type SentryStackFrame = {
+  filename?: string;
+  absPath?: string;
+  function?: string;
+  lineno?: number;
+  colno?: number;
+};
+
+export type SentryEvent = {
+  id?: string;
+  eventID?: string;
+  dateCreated?: string;
+  environment?: string | null;
+  release?: string | null;
+  tags?: Array<{ key: string; value: string }>;
+  exception?: {
+    values?: Array<{
+      type?: string;
+      value?: string;
+      stacktrace?: { frames?: SentryStackFrame[] };
+    }>;
+  };
+  breadcrumbs?: { values?: Array<Record<string, unknown>> };
+  request?: {
+    url?: string;
+    method?: string;
+    headers?: Array<[string, string]>;
+    data?: unknown;
+  };
 };
 
 export class SentryApiError extends Error {
@@ -61,6 +93,7 @@ export async function fetchUnresolvedSentryIssues(
     permalink: string;
     firstSeen: string;
     lastSeen: string;
+    count?: string;
   }>;
 
   return data.map((d) => ({
@@ -70,5 +103,27 @@ export async function fetchUnresolvedSentryIssues(
     permalink: d.permalink,
     firstSeen: d.firstSeen,
     lastSeen: d.lastSeen,
+    count: d.count ?? '1',
   }));
+}
+
+export async function fetchLatestEventForIssue(
+  space: Space,
+  issueId: string,
+  signal?: AbortSignal,
+): Promise<SentryEvent> {
+  const url = `${space.sentryBaseUrl}/api/0/issues/${issueId}/events/latest/`;
+  const res = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${space.sentryAuthToken}`,
+      Accept: 'application/json',
+      'User-Agent': 'auto-bug-fixer',
+    },
+    signal,
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new SentryApiError(`Sentry ${res.status} on ${url}`, res.status, body.slice(0, 500));
+  }
+  return (await res.json()) as SentryEvent;
 }

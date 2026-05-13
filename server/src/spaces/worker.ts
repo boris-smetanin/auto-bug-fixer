@@ -3,7 +3,9 @@ import path from 'node:path';
 import type { Space } from '@abf/shared';
 import { config } from '../config.js';
 import { logEvent } from '../logger.js';
+import { drainFixAttempt } from './drain.js';
 import {
+  claimNextQueuedForSpace,
   hasAttemptForSentryIssue,
   hasInProgressAttempt,
   insertQueuedFixAttempt,
@@ -95,12 +97,6 @@ async function runTick(spaceId: string): Promise<void> {
     return;
   }
 
-  logEvent({
-    src: 'orchestrator',
-    msg: 'tick',
-    data: { spaceId, spaceName: space.name },
-  });
-
   if (hasInProgressAttempt(spaceId)) {
     logEvent({
       src: 'orchestrator',
@@ -109,6 +105,34 @@ async function runTick(spaceId: string): Promise<void> {
     });
     return;
   }
+
+  // Drain takes priority over polling — process backlog before fetching more.
+  const claimed = claimNextQueuedForSpace(spaceId);
+  if (claimed) {
+    logEvent({
+      src: 'orchestrator',
+      msg: 'draining fix attempt',
+      data: {
+        spaceId,
+        fixAttemptId: claimed.id,
+        sentryIssueId: claimed.sentryIssueId,
+      },
+    });
+    await drainFixAttempt(space, claimed);
+    return;
+  }
+
+  await pollAndQueue(space);
+}
+
+async function pollAndQueue(space: Space): Promise<void> {
+  const spaceId = space.id;
+
+  logEvent({
+    src: 'orchestrator',
+    msg: 'tick',
+    data: { spaceId, spaceName: space.name },
+  });
 
   let issues: SentryIssue[];
   try {

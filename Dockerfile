@@ -20,19 +20,24 @@ WORKDIR /app
 ENV NODE_ENV=production \
     PORT=3000 \
     DATA_DIR=/data \
-    CORS_ORIGIN=*
+    CORS_ORIGIN=* \
+    HOME=/home/node
 RUN apt-get update \
- && apt-get install -y --no-install-recommends ca-certificates curl git \
+ && apt-get install -y --no-install-recommends ca-certificates curl git gosu \
  && rm -rf /var/lib/apt/lists/* \
- && mkdir -p /data
-COPY --from=build /app/package.json ./
-COPY --from=build /app/shared ./shared
-COPY --from=build /app/server/package.json ./server/
-COPY --from=build /app/server/dist ./server/dist
-COPY --from=build /app/web/dist ./web/dist
-COPY --from=build /app/node_modules ./node_modules
+ && mkdir -p /data /home/node/.config /home/node/.cache \
+ && chown -R node:node /data /home/node
+COPY --from=build --chown=node:node /app/package.json ./
+COPY --from=build --chown=node:node /app/shared ./shared
+COPY --from=build --chown=node:node /app/server/package.json ./server/
+COPY --from=build --chown=node:node /app/server/dist ./server/dist
+COPY --from=build --chown=node:node /app/web/dist ./web/dist
+COPY --from=build --chown=node:node /app/node_modules ./node_modules
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 EXPOSE 3000
 VOLUME ["/data"]
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD curl -fsS http://localhost:3000/healthz || exit 1
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 CMD ["node", "server/dist/index.js"]
