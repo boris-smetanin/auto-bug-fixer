@@ -22,7 +22,12 @@ Single-context repo: `CONTEXT.md` and `docs/adr/` at the repo root (created lazi
 
 Two Docker workflows:
 
-- **`docker compose up -d`** — default. Bind-mounts source, runs `tsx watch` (server) + Vite dev server (web, port 5173, with HMR). Edits on the host reflect inside the container in ~1-2s. Use `http://localhost:5173` for the UI; it proxies `/api` and `/healthz` to the Hono server on `:3000`.
-- **`docker compose -f compose.prod.yml up -d --build`** — opt-in production-ish run. Builds the full Dockerfile (multi-stage, compiled artifacts) and runs the runtime image. No hot reload; rebuild on every change. Use this only when you want parity with deployment.
+- **`docker compose up -d`** — default. **Two containers:**
+  - `abf-server` (Hono API) bound to `${PORT:-3000}`, runs `tsx watch`.
+  - `abf-web` (Vite dev server, HMR) bound to `${WEB_PORT:-5173}`. Vite proxies `/api` and `/healthz` to the `server` container via the compose network.
+  - Source is bind-mounted into both; anonymous node_modules volumes keep container/host bindings independent.
+  - Filtered logs: `docker compose logs -f server` / `docker compose logs -f web`.
+  - **Open `http://localhost:${WEB_PORT:-5173}` for the UI.**
+- **`docker compose -f compose.prod.yml up -d --build`** — single-container production-ish run. Builds the multi-stage Dockerfile, runs the compiled artifacts. Hono serves the built `web/dist/` directly on `${PORT:-3000}`. No hot reload. The dev/prod asymmetry is intentional: a real split deployment would put nginx in front in prod; deferred until needed.
 
-The `.env` file is auto-loaded by both. `Dockerfile` itself is unchanged across the two — `compose.yml` uses its `build` stage as a "container with full deps", `compose.prod.yml` uses the whole multi-stage build.
+Ports come from `.env` (auto-loaded). Defaults: `PORT=3000`, `WEB_PORT=5173`. Both have `:-` fallbacks in the compose files, so `.env` is optional.
