@@ -8,7 +8,8 @@ import { startLogCleanupTimer, stopLogCleanupTimer } from './log-cleanup.js';
 import { closeAppLogger, initAppLogger, logEvent } from './core/logger.js';
 import { settingsRouter } from './settings-routes.js';
 import { logsRouter } from './spaces/logs-routes.js';
-import { markOrphanedAttempts } from './spaces/fix-attempts.js';
+import { fixAttemptsController } from './fix-attempts/fix-attempts.controller.js';
+import { markOrphanedAttempts } from './fix-attempts/fix-attempts.service.js';
 import { spacesRouter } from './spaces/routes.js';
 import { spacesController } from './spaces/spaces.controller.js';
 import { resumeRunningSpaces, stopAllWorkers } from './spaces/worker.js';
@@ -43,6 +44,7 @@ app.use('*', cors({ origin: config.corsOrigin }));
 app.get('/healthz', (c) => c.json<HealthResponse>({ ok: true }));
 
 app.route('/api', spacesController);
+app.route('/api', fixAttemptsController);
 app.route('/api', spacesRouter);
 app.route('/api', logsRouter);
 app.route('/api', settingsRouter);

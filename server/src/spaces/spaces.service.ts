@@ -5,7 +5,7 @@ import type { Space, SpaceInput, ValidationErrors } from '@abf/shared';
 import { config } from '../core/config.js';
 import { logEvent } from '../core/logger.js';
 import { GitError, gitClone } from '../integrations/git.client.js';
-import { hasInProgressAttempt } from './fix-attempts.js';
+import { hasInProgressAttempt } from '../fix-attempts/fix-attempts.service.js';
 import {
   deleteSpace,
   findSpaceById,

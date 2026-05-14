@@ -93,10 +93,15 @@ export function findFixAttemptById(id: string): FixAttempt | undefined {
   return row ? rowToAttempt(row) : undefined;
 }
 
-/**
- * Atomically transition a *specific* queued attempt to in_progress.
- * Returns the updated row, or undefined if the attempt isn't queued.
- */
+export function listFixAttemptsBySpace(spaceId: string, limit = 50): FixAttempt[] {
+  const rows = getDb()
+    .prepare(
+      'SELECT * FROM fix_attempts WHERE space_id = ? ORDER BY created_at DESC LIMIT ?',
+    )
+    .all(spaceId, limit) as FixAttemptRow[];
+  return rows.map(rowToAttempt);
+}
+
 export function claimFixAttemptById(id: string): FixAttempt | undefined {
   const row = getDb()
     .prepare(
@@ -110,19 +115,6 @@ export function claimFixAttemptById(id: string): FixAttempt | undefined {
   return row ? rowToAttempt(row) : undefined;
 }
 
-export function listFixAttemptsBySpace(spaceId: string, limit = 50): FixAttempt[] {
-  const rows = getDb()
-    .prepare(
-      'SELECT * FROM fix_attempts WHERE space_id = ? ORDER BY created_at DESC LIMIT ?',
-    )
-    .all(spaceId, limit) as FixAttemptRow[];
-  return rows.map(rowToAttempt);
-}
-
-/**
- * Atomically pick the oldest queued attempt for a Space and transition it to
- * `in_progress`. Returns the picked attempt, or undefined if none queued.
- */
 export function claimNextQueuedForSpace(spaceId: string): FixAttempt | undefined {
   const row = getDb()
     .prepare(
@@ -138,6 +130,25 @@ export function claimNextQueuedForSpace(spaceId: string): FixAttempt | undefined
        RETURNING *`,
     )
     .get(spaceId) as FixAttemptRow | undefined;
+  return row ? rowToAttempt(row) : undefined;
+}
+
+export function resetFailedToInProgress(id: string): FixAttempt | undefined {
+  const row = getDb()
+    .prepare(
+      `UPDATE fix_attempts
+       SET state = 'in_progress',
+           failure_reason = NULL,
+           failure_message = NULL,
+           failure_context = NULL,
+           pr_number = NULL,
+           pr_url = NULL,
+           started_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
+           ended_at = NULL
+       WHERE id = ? AND state = 'failed'
+       RETURNING *`,
+    )
+    .get(id) as FixAttemptRow | undefined;
   return row ? rowToAttempt(row) : undefined;
 }
 
@@ -158,51 +169,6 @@ export function markFixAttemptPrOpened(
     .run(prNumber, prUrl, id);
 }
 
-/**
- * Atomically reset a failed Fix Attempt back to `in_progress` for a retry.
- * Clears the failure fields and resets timestamps. Returns the updated row,
- * or undefined if the attempt isn't currently `failed`.
- */
-export function resetFailedToInProgress(id: string): FixAttempt | undefined {
-  const row = getDb()
-    .prepare(
-      `UPDATE fix_attempts
-       SET state = 'in_progress',
-           failure_reason = NULL,
-           failure_message = NULL,
-           failure_context = NULL,
-           pr_number = NULL,
-           pr_url = NULL,
-           started_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
-           ended_at = NULL
-       WHERE id = ? AND state = 'failed'
-       RETURNING *`,
-    )
-    .get(id) as FixAttemptRow | undefined;
-  return row ? rowToAttempt(row) : undefined;
-}
-
-/**
- * On Node startup, any Fix Attempt left in `queued` or `in_progress` is an
- * orphan — the process that owned it is gone. Transition them all to
- * `failed:orphaned` so the loop can resume cleanly. Returns the affected
- * row IDs.
- */
-export function markOrphanedAttempts(message: string): string[] {
-  const rows = getDb()
-    .prepare(
-      `UPDATE fix_attempts
-       SET state = 'failed',
-           failure_reason = 'orphaned',
-           failure_message = ?,
-           ended_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
-       WHERE state IN ('queued', 'in_progress')
-       RETURNING id`,
-    )
-    .all(message) as { id: string }[];
-  return rows.map((r) => r.id);
-}
-
 export function markFixAttemptFailed(
   id: string,
   reason: string,
@@ -220,4 +186,19 @@ export function markFixAttemptFailed(
        WHERE id = ?`,
     )
     .run(reason, message, context ? JSON.stringify(context) : null, id);
+}
+
+export function markOrphanedAttempts(message: string): string[] {
+  const rows = getDb()
+    .prepare(
+      `UPDATE fix_attempts
+       SET state = 'failed',
+           failure_reason = 'orphaned',
+           failure_message = ?,
+           ended_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+       WHERE state IN ('queued', 'in_progress')
+       RETURNING id`,
+    )
+    .all(message) as { id: string }[];
+  return rows.map((r) => r.id);
 }

@@ -4,7 +4,7 @@ import {
   findFixAttemptById,
   findInProgressAttemptForSpace,
   listFixAttemptsBySpace,
-} from './fix-attempts.js';
+} from '../fix-attempts/fix-attempts.service.js';
 import { createTailer, type Tailer } from './log-tailer.js';
 import { findSpaceById } from './spaces.repository.js';
 
