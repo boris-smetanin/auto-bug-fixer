@@ -1,43 +1,68 @@
-# Local-dev configuration with hot reload.
+# Local-dev configuration with hot reload, split into two services.
 #
-# - Bind-mounts source from your Mac into /app inside the container so edits
-#   appear instantly. tsx watches the server, Vite HMR reloads the web UI.
-# - Anonymous volumes shadow every node_modules path so the container keeps
-#   its own Linux native bindings (e.g. better-sqlite3) independent of your
-#   host's macOS binaries — no cross-contamination on `npm install`.
-# - Uses the Dockerfile's `build` stage, which already has all deps installed.
-# - For a production-ish run (compiled artifacts, runtime image), use
-#   compose.prod.yml instead.
+# - `server` runs the Hono API with `tsx watch` on ${PORT:-3000}.
+# - `web` runs the Vite dev server with HMR on ${WEB_PORT:-5173}. Vite
+#   proxies /api and /healthz to the `server` container via the compose
+#   network (resolved by service name).
+# - Both services bind-mount the host source into /app so edits reload
+#   instantly. Each gets anonymous volumes on its node_modules so the
+#   container's Linux native bindings (e.g. better-sqlite3) stay isolated
+#   from the host's macOS binaries.
+# - Logs filter cleanly per service:
+#     docker compose logs -f server
+#     docker compose logs -f web
+# - For the production-shaped single-container run, use compose.prod.yml.
 #
 # Usage:
-#   cp .env.example .env       # fill in ANTHROPIC_API_KEY
-#   docker compose up -d       # first time: builds + installs; ~minute
-#   open http://localhost:5173 # Vite dev server with HMR (proxies /api)
-#   docker compose logs -f
-#   docker compose down
+#   cp .env.example .env
+#   docker compose up -d
+#   open http://localhost:${WEB_PORT:-5173}   # Vite dev UI (proxies /api)
 
 services:
-  auto-bug-fixer:
-    container_name: auto-bug-fixer
+  server:
+    container_name: abf-server
     build:
       context: .
       dockerfile: Dockerfile
       target: build
-    command: sh -c "npm install && npm run dev"
+    command: sh -c "npm install && npm run dev:server"
+    working_dir: /app
     volumes:
       - .:/app
-      # Anonymous volumes — container keeps its own node_modules with the
-      # correct Linux native bindings. Each workspace gets one because npm
-      # may not always hoist 100%.
       - /app/node_modules
       - /app/server/node_modules
-      - /app/web/node_modules
       - /app/shared/node_modules
       - ./data:/data
     env_file:
       - path: .env
         required: false
     ports:
-      - "${PORT:-3000}:${PORT:-3000}"   # Hono API + (in prod) static UI
-      - "${VITE_PORT:-5173}:${VITE_PORT:-5173}" # Vite dev server with HMR
+      - "${PORT:-3000}:${PORT:-3000}"
+    restart: unless-stopped
+
+  web:
+    container_name: abf-web
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: build
+    command: sh -c "npm install && npm run dev:web"
+    working_dir: /app
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/web/node_modules
+      - /app/shared/node_modules
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      # Vite (in this container) proxies API calls to the server container,
+      # reached via the compose network on its service name.
+      VITE_PROXY_TARGET: http://server:${PORT:-3000}
+      WEB_PORT: ${WEB_PORT:-5173}
+    ports:
+      - "${WEB_PORT:-5173}:${WEB_PORT:-5173}"
+    depends_on:
+      - server
     restart: unless-stopped
