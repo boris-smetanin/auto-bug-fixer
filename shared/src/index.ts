@@ -30,6 +30,8 @@ export type Space = {
   extraSentryQuery: string;
   tickIntervalSeconds: number;
   fixLoopRunning: boolean;
+  /** Derived: true if any Fix Attempt for this Space is currently in_progress. */
+  busy: boolean;
   createdAt: string;
   updatedAt: string;
 };

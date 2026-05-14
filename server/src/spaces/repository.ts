@@ -17,6 +17,7 @@ type SpaceRow = {
   fix_loop_running: number;
   created_at: string;
   updated_at: string;
+  busy?: number;
 };
 
 function rowToSpace(row: SpaceRow): Space {
@@ -34,12 +35,21 @@ function rowToSpace(row: SpaceRow): Space {
     extraSentryQuery: row.extra_sentry_query,
     tickIntervalSeconds: row.tick_interval_seconds,
     fixLoopRunning: row.fix_loop_running === 1,
+    busy: row.busy === 1,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
 }
 
-export type NewSpace = Omit<Space, 'fixLoopRunning' | 'createdAt' | 'updatedAt'>;
+export type NewSpace = Omit<Space, 'fixLoopRunning' | 'busy' | 'createdAt' | 'updatedAt'>;
+
+const SELECT_WITH_BUSY = `
+  SELECT s.*, EXISTS(
+    SELECT 1 FROM fix_attempts a
+    WHERE a.space_id = s.id AND a.state = 'in_progress'
+  ) AS busy
+  FROM spaces s
+`;
 
 export function insertSpace(s: NewSpace): Space {
   const stmt = getDb().prepare(`
@@ -54,42 +64,48 @@ export function insertSpace(s: NewSpace): Space {
     )
     RETURNING *
   `);
-  return rowToSpace(stmt.get(s) as SpaceRow);
+  // A brand-new Space has no fix_attempts yet, so busy is trivially false.
+  const row = stmt.get(s) as SpaceRow;
+  return rowToSpace({ ...row, busy: 0 });
 }
 
 export function listSpaces(): Space[] {
   const rows = getDb()
-    .prepare('SELECT * FROM spaces ORDER BY created_at DESC')
+    .prepare(`${SELECT_WITH_BUSY} ORDER BY s.created_at DESC`)
     .all() as SpaceRow[];
   return rows.map(rowToSpace);
 }
 
 export function findSpaceById(id: string): Space | undefined {
   const row = getDb()
-    .prepare('SELECT * FROM spaces WHERE id = ?')
+    .prepare(`${SELECT_WITH_BUSY} WHERE s.id = ?`)
     .get(id) as SpaceRow | undefined;
   return row ? rowToSpace(row) : undefined;
 }
 
 export function updateSpace(id: string, fields: NewSpace): Space {
-  const stmt = getDb().prepare(`
-    UPDATE spaces SET
-      name = @name,
-      github_owner = @githubOwner,
-      github_repo = @githubRepo,
-      github_token = @githubToken,
-      base_branch = @baseBranch,
-      sentry_base_url = @sentryBaseUrl,
-      sentry_org_slug = @sentryOrgSlug,
-      sentry_project_slug = @sentryProjectSlug,
-      sentry_auth_token = @sentryAuthToken,
-      extra_sentry_query = @extraSentryQuery,
-      tick_interval_seconds = @tickIntervalSeconds,
-      updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
-    WHERE id = @id
-    RETURNING *
-  `);
-  return rowToSpace(stmt.get({ ...fields, id }) as SpaceRow);
+  getDb()
+    .prepare(`
+      UPDATE spaces SET
+        name = @name,
+        github_owner = @githubOwner,
+        github_repo = @githubRepo,
+        github_token = @githubToken,
+        base_branch = @baseBranch,
+        sentry_base_url = @sentryBaseUrl,
+        sentry_org_slug = @sentryOrgSlug,
+        sentry_project_slug = @sentryProjectSlug,
+        sentry_auth_token = @sentryAuthToken,
+        extra_sentry_query = @extraSentryQuery,
+        tick_interval_seconds = @tickIntervalSeconds,
+        updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+      WHERE id = @id
+    `)
+    .run({ ...fields, id });
+  // Refetch via findSpaceById to include the derived `busy` column.
+  const updated = findSpaceById(id);
+  if (!updated) throw new Error(`updateSpace: row ${id} not found after update`);
+  return updated;
 }
 
 export function deleteSpace(id: string): void {

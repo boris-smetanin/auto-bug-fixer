@@ -6,12 +6,29 @@ import { config } from './config.js';
 import { closeDb, initDb } from './db.js';
 import { closeAppLogger, initAppLogger, logEvent } from './logger.js';
 import { logsRouter } from './spaces/logs-routes.js';
+import { markOrphanedAttempts } from './spaces/fix-attempts.js';
 import { spacesRouter } from './spaces/routes.js';
 import { resumeRunningSpaces, stopAllWorkers } from './spaces/worker.js';
 import { staticHandler } from './static.js';
 
 initDb({ dataDir: config.dataDir, migrationsPath: config.migrationsPath });
 initAppLogger(config.logsDir);
+
+// Reconcile any Fix Attempts that were mid-flight when the previous
+// process exited. Must run before resumeRunningSpaces so a resumed worker
+// doesn't race the orphan sweep.
+const orphans = markOrphanedAttempts(
+  'Worker process exited before this attempt could finish (container restart or crash).',
+);
+if (orphans.length > 0) {
+  logEvent({
+    src: 'orchestrator',
+    level: 'warn',
+    msg: `reconciled ${orphans.length} orphaned fix attempts`,
+    data: { fixAttemptIds: orphans },
+  });
+}
+
 resumeRunningSpaces();
 
 const app = new Hono();

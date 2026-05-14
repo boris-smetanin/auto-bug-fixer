@@ -133,9 +133,15 @@ export function FixAttemptDetail() {
         </CardHeader>
         <CardContent>
           {logLines === null && <p className="text-sm text-neutral-500">Loading logs…</p>}
-          {logLines?.length === 0 && (
-            <p className="text-sm text-neutral-500">No log lines for this attempt.</p>
-          )}
+          {logLines?.length === 0 &&
+            (attempt.failureReason === 'orphaned' ? (
+              <p className="text-sm text-neutral-500">
+                This Fix Attempt was orphaned during a restart. Its log file is incomplete or
+                missing. Click Retry to start fresh.
+              </p>
+            ) : (
+              <p className="text-sm text-neutral-500">No log lines for this attempt.</p>
+            ))}
           {logLines && logLines.length > 0 && (
             <div className="max-h-[40rem] overflow-y-auto rounded-md border border-neutral-200 bg-neutral-50 p-3 font-mono text-xs leading-relaxed dark:border-neutral-800 dark:bg-neutral-950">
               {logLines.map((line, i) => (

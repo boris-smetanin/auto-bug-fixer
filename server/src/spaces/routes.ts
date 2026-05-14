@@ -270,7 +270,8 @@ spacesRouter.post('/spaces/:id/loop/start', (c) => {
   if (!space) return c.json({ error: 'not found' }, 404);
   setFixLoopRunning(space.id, true);
   startWorker({ ...space, fixLoopRunning: true });
-  return c.json({ ...space, fixLoopRunning: true });
+  // Refetch so the response reflects fix_loop_running + the derived busy.
+  return c.json(findSpaceById(space.id));
 });
 
 spacesRouter.post('/spaces/:id/loop/stop', (c) => {
@@ -278,7 +279,9 @@ spacesRouter.post('/spaces/:id/loop/stop', (c) => {
   if (!space) return c.json({ error: 'not found' }, 404);
   setFixLoopRunning(space.id, false);
   stopWorker(space.id);
-  return c.json({ ...space, fixLoopRunning: false });
+  // Refetch so the response reflects fix_loop_running + the derived busy.
+  // The drain (if any) keeps running — busy stays true until it completes.
+  return c.json(findSpaceById(space.id));
 });
 
 spacesRouter.post('/spaces', async (c) => {
