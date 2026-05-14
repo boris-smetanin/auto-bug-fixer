@@ -13,8 +13,10 @@ import {
   listSpaces,
   updateSpace,
 } from './spaces.repository.js';
+
+export { setFixLoopRunning } from './spaces.repository.js';
 import { validateCredentials } from './spaces.validators.js';
-import { stopWorker } from './worker.js';
+import { stopLoop } from '../fix-loop/fix-loop.service.js';
 
 type SpaceServiceErrorInit =
   | { kind: 'errors'; status: 400; errors: ValidationErrors }
@@ -43,6 +45,10 @@ export class SpaceServiceError extends Error {
 
 export function listAllSpaces(): Space[] {
   return listSpaces();
+}
+
+export function findSpace(id: string): Space | undefined {
+  return findSpaceById(id);
 }
 
 export function getSpace(id: string): Space {
@@ -246,7 +252,7 @@ export async function deleteSpaceWithCleanup(id: string): Promise<void> {
   }
 
   // Defense in depth: ensure any lingering worker timer is cleared.
-  stopWorker(space.id);
+  stopLoop(space.id);
 
   await rm(path.join(config.dataDir, 'cloned_repos', space.id), {
     recursive: true,
