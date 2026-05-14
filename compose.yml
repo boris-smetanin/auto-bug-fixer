@@ -49,6 +49,7 @@ services:
       context: .
       dockerfile: Dockerfile
       target: build
+    entrypoint: /app/docker-entrypoint.sh
     command: sh -c "npm install && npm run dev:web"
     working_dir: /app
     volumes:

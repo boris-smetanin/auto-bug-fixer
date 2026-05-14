@@ -18,7 +18,8 @@ set -e
 if [ "$(id -u)" = "0" ]; then
   mkdir -p /home/node/.config /home/node/.cache
   for d in /data /home/node \
-           /app/node_modules /app/server/node_modules /app/shared/node_modules; do
+           /app/node_modules /app/server/node_modules \
+           /app/web/node_modules /app/shared/node_modules; do
     [ -e "$d" ] && chown -R node:node "$d" 2>/dev/null || true
   done
   # gosu does not switch HOME; without this, the node user would inherit the

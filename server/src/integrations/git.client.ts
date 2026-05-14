@@ -30,11 +30,19 @@ type RunOpts = {
 
 async function runGit(opts: RunOpts): Promise<{ stdout: string; stderr: string }> {
   let askpassDir: string | undefined;
+  // Pin the committer + author identity so amend/commit never falls back to
+  // git's synthetic "<user>@<hostname>" identity. The node user inside the
+  // container has no ~/.gitconfig; without these, git emits a warning and
+  // the resulting commit author drifts with /etc/passwd content.
   const env: NodeJS.ProcessEnv = {
     PATH: process.env.PATH,
     HOME: process.env.HOME,
     GIT_TERMINAL_PROMPT: '0',
     LANG: process.env.LANG,
+    GIT_AUTHOR_NAME: 'auto-bug-fixer',
+    GIT_AUTHOR_EMAIL: 'auto-bug-fixer@local',
+    GIT_COMMITTER_NAME: 'auto-bug-fixer',
+    GIT_COMMITTER_EMAIL: 'auto-bug-fixer@local',
   };
 
   if (opts.token) {
@@ -52,10 +60,12 @@ async function runGit(opts: RunOpts): Promise<{ stdout: string; stderr: string }
   }
 
   return new Promise((resolve, reject) => {
-    // safe.directory=* sidesteps git's "dubious ownership" check when the
-    // clone dir's owning UID differs from the process UID — happens with
-    // bind-mounted /data across container rebuilds or user changes.
-    const child = spawn('git', ['-c', 'safe.directory=*', ...opts.args], {
+    // safe.directory=<cwd> sidesteps git's "dubious ownership" check when
+    // the clone dir's owning UID differs from the process UID — happens
+    // with bind-mounted /data across container rebuilds or user changes.
+    // Scoped per-invocation to the directory we're actually operating on,
+    // rather than the broader '*' wildcard.
+    const child = spawn('git', ['-c', `safe.directory=${opts.cwd}`, ...opts.args], {
       cwd: opts.cwd,
       env,
       stdio: ['ignore', 'pipe', 'pipe'],
