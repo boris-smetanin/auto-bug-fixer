@@ -48,7 +48,9 @@ function ensureMigrationsTable(d: Db): void {
 }
 
 function applyPendingMigrations(d: Db, migrationsPath: string): void {
-  if (!fs.existsSync(migrationsPath)) return;
+  if (!fs.existsSync(migrationsPath)) {
+    throw new Error(`migrations directory does not exist: ${migrationsPath}`);
+  }
 
   const files = fs
     .readdirSync(migrationsPath)

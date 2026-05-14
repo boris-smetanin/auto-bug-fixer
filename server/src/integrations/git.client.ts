@@ -52,7 +52,10 @@ async function runGit(opts: RunOpts): Promise<{ stdout: string; stderr: string }
   }
 
   return new Promise((resolve, reject) => {
-    const child = spawn('git', opts.args, {
+    // safe.directory=* sidesteps git's "dubious ownership" check when the
+    // clone dir's owning UID differs from the process UID — happens with
+    // bind-mounted /data across container rebuilds or user changes.
+    const child = spawn('git', ['-c', 'safe.directory=*', ...opts.args], {
       cwd: opts.cwd,
       env,
       stdio: ['ignore', 'pipe', 'pipe'],

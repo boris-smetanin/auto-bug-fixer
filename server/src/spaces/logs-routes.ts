@@ -6,7 +6,7 @@ import {
   listFixAttemptsBySpace,
 } from './fix-attempts.js';
 import { createTailer, type Tailer } from './log-tailer.js';
-import { findSpaceById } from './repository.js';
+import { findSpaceById } from './spaces.repository.js';
 
 export const logsRouter = new Hono();
 
