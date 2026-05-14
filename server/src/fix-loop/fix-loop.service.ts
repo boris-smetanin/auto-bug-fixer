@@ -9,8 +9,8 @@ import {
   hasInProgressAttempt,
   insertQueuedFixAttempt,
 } from '../fix-attempts/fix-attempts.service.js';
-import { fixBranchName, remoteBranchExists } from '../integrations/github.client.js';
-import { fetchUnresolvedSentryIssues, type SentryIssue } from '../integrations/sentry.client.js';
+import { fixBranchName, remoteBranchExists } from '../integrations/github/github.client.js';
+import { fetchUnresolvedSentryIssues, type SentryIssue } from '../integrations/sentry/sentry.client.js';
 import { drainFixAttempt } from '../drain/drain.service.js';
 import { findSpace, listAllSpaces } from '../spaces/spaces.service.js';
 
