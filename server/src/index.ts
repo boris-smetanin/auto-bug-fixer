@@ -7,7 +7,7 @@ import { closeDb, initDb } from './core/db.js';
 import { startLogCleanupTimer, stopLogCleanupTimer } from './log-cleanup.js';
 import { closeAppLogger, initAppLogger, logEvent } from './core/logger.js';
 import { settingsRouter } from './settings-routes.js';
-import { logsRouter } from './spaces/logs-routes.js';
+import { logsController } from './logs/logs.controller.js';
 import { fixAttemptsController } from './fix-attempts/fix-attempts.controller.js';
 import { markOrphanedAttempts } from './fix-attempts/fix-attempts.service.js';
 import { fixLoopController } from './fix-loop/fix-loop.controller.js';
@@ -46,7 +46,7 @@ app.get('/healthz', (c) => c.json<HealthResponse>({ ok: true }));
 app.route('/api', spacesController);
 app.route('/api', fixAttemptsController);
 app.route('/api', fixLoopController);
-app.route('/api', logsRouter);
+app.route('/api', logsController);
 app.route('/api', settingsRouter);
 
 app.get('*', staticHandler(config.webDistPath));
