@@ -1,6 +1,6 @@
 import path from 'node:path';
 import type { FixAttempt, FixAttemptFailureReason, Space } from '@abf/shared';
-import { config } from '../config.js';
+import { config } from '../core/config.js';
 import { createAttemptLog } from './attempt-log.js';
 import { ClaudeRunError, runClaudeFix } from '../integrations/claude.runner.js';
 import {

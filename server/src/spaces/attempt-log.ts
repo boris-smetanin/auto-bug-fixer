@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { logEvent, type LogEvent } from '../logger.js';
+import { logEvent, type LogEvent } from '../core/logger.js';
 
 export type AttemptLogger = {
   log: (

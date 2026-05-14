@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import type { Space } from '@abf/shared';
-import { config } from '../config.js';
-import { logEvent } from '../logger.js';
+import { config } from '../core/config.js';
+import { logEvent } from '../core/logger.js';
 import { drainFixAttempt } from './drain.js';
 import {
   claimNextQueuedForSpace,

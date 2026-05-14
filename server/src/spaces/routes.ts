@@ -4,8 +4,8 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { Hono } from 'hono';
 import type { SpaceInput } from '@abf/shared';
-import { config } from '../config.js';
-import { logEvent } from '../logger.js';
+import { config } from '../core/config.js';
+import { logEvent } from '../core/logger.js';
 import { drainFixAttempt } from './drain.js';
 import {
   claimFixAttemptById,
