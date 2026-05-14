@@ -1,4 +1,10 @@
-import type { FixAttempt, Space, SpaceInput, ValidationErrors } from '@abf/shared';
+import type {
+  FixAttempt,
+  GlobalSettings,
+  Space,
+  SpaceInput,
+  ValidationErrors,
+} from '@abf/shared';
 
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? '';
 
@@ -117,6 +123,51 @@ export async function getFixAttemptLogText(
     apiUrl(`/api/spaces/${spaceId}/fix-attempts/${fixAttemptId}/logs`),
   );
   if (!res.ok) throw new Error(`get logs failed: ${res.status}`);
+  return res.text();
+}
+
+export async function getSettings(): Promise<GlobalSettings> {
+  const res = await fetch(apiUrl('/api/settings'));
+  if (!res.ok) throw new Error(`get settings failed: ${res.status}`);
+  return res.json() as Promise<GlobalSettings>;
+}
+
+export type UpdateSettingsResult =
+  | { ok: true; settings: GlobalSettings }
+  | { ok: false; errors: ValidationErrors };
+
+export async function updateSettings(
+  fields: Partial<GlobalSettings>,
+): Promise<UpdateSettingsResult> {
+  const res = await fetch(apiUrl('/api/settings'), {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(fields),
+  });
+  if (res.ok) return { ok: true, settings: (await res.json()) as GlobalSettings };
+  if (res.status === 400) {
+    const body = (await res.json()) as { errors: ValidationErrors };
+    return { ok: false, errors: body.errors };
+  }
+  throw new Error(`PATCH /api/settings unexpected ${res.status}`);
+}
+
+export type AppLogFile = {
+  date: string;
+  filename: string;
+  sizeBytes: number;
+  mtime: string;
+};
+
+export async function listAppLogs(): Promise<AppLogFile[]> {
+  const res = await fetch(apiUrl('/api/app-logs'));
+  if (!res.ok) throw new Error(`list app logs failed: ${res.status}`);
+  return res.json() as Promise<AppLogFile[]>;
+}
+
+export async function getAppLog(date: string): Promise<string> {
+  const res = await fetch(apiUrl(`/api/app-logs/${date}`));
+  if (!res.ok) throw new Error(`get app log failed: ${res.status}`);
   return res.text();
 }
 

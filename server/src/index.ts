@@ -4,7 +4,9 @@ import { cors } from 'hono/cors';
 import type { HealthResponse } from '@abf/shared';
 import { config } from './config.js';
 import { closeDb, initDb } from './db.js';
+import { startLogCleanupTimer, stopLogCleanupTimer } from './log-cleanup.js';
 import { closeAppLogger, initAppLogger, logEvent } from './logger.js';
+import { settingsRouter } from './settings-routes.js';
 import { logsRouter } from './spaces/logs-routes.js';
 import { markOrphanedAttempts } from './spaces/fix-attempts.js';
 import { spacesRouter } from './spaces/routes.js';
@@ -31,6 +33,8 @@ if (orphans.length > 0) {
 
 resumeRunningSpaces();
 
+startLogCleanupTimer(config.logsDir);
+
 const app = new Hono();
 
 app.use('*', cors({ origin: config.corsOrigin }));
@@ -39,6 +43,7 @@ app.get('/healthz', (c) => c.json<HealthResponse>({ ok: true }));
 
 app.route('/api', spacesRouter);
 app.route('/api', logsRouter);
+app.route('/api', settingsRouter);
 
 app.get('*', staticHandler(config.webDistPath));
 
@@ -53,6 +58,7 @@ server.headersTimeout = 11 * 60 * 1000;
 const shutdown = (signal: string): void => {
   logEvent({ src: 'orchestrator', msg: `received ${signal}, shutting down` });
   stopAllWorkers();
+  stopLogCleanupTimer();
   server.close(() => {
     closeDb();
     closeAppLogger();
