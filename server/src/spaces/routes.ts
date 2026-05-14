@@ -6,7 +6,6 @@ import { Hono } from 'hono';
 import type { SpaceInput } from '@abf/shared';
 import { config } from '../config.js';
 import { logEvent } from '../logger.js';
-import { CloneError, cloneRepoWithToken } from './clone.js';
 import { drainFixAttempt } from './drain.js';
 import {
   claimFixAttemptById,
@@ -17,12 +16,13 @@ import {
   listFixAttemptsBySpace,
   resetFailedToInProgress,
 } from './fix-attempts.js';
-import { fixBranchName } from './github.js';
+import { fixBranchName } from '../integrations/github.client.js';
 import {
   gitCheckout,
+  gitClone,
   gitDeleteLocalBranchIfExists,
   GitError,
-} from './git.js';
+} from '../integrations/git.client.js';
 import { parseSpaceInput } from './parse.js';
 import {
   deleteSpace,
@@ -107,7 +107,7 @@ spacesRouter.patch('/spaces/:id', async (c) => {
     const oldClone = path.join(config.dataDir, 'cloned_repos', space.id);
     const newClone = path.join(config.dataDir, 'cloned_repos', `${space.id}.new`);
     try {
-      await cloneRepoWithToken({
+      await gitClone({
         owner: merged.githubOwner,
         repo: merged.githubRepo,
         token: merged.githubToken,
@@ -115,7 +115,7 @@ spacesRouter.patch('/spaces/:id', async (c) => {
         signal,
       });
     } catch (err) {
-      if (err instanceof CloneError && err.aborted) return c.body(null, 499);
+      if (err instanceof GitError && err.aborted) return c.body(null, 499);
       await rm(newClone, { recursive: true, force: true }).catch(() => undefined);
       const message = err instanceof Error ? err.message : String(err);
       return c.json({ errors: { githubRepo: `Re-clone failed: ${message}` } }, 400);
@@ -386,7 +386,7 @@ spacesRouter.post('/spaces', async (c) => {
   const destDir = path.join(config.dataDir, 'cloned_repos', id);
 
   try {
-    await cloneRepoWithToken({
+    await gitClone({
       owner: input.githubOwner,
       repo: input.githubRepo,
       token: input.githubToken,
@@ -394,7 +394,7 @@ spacesRouter.post('/spaces', async (c) => {
       signal,
     });
   } catch (err) {
-    if (err instanceof CloneError && err.aborted) {
+    if (err instanceof GitError && err.aborted) {
       return c.body(null, 499);
     }
     const message = err instanceof Error ? err.message : String(err);

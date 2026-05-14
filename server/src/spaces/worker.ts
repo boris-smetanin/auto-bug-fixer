@@ -10,9 +10,9 @@ import {
   hasInProgressAttempt,
   insertQueuedFixAttempt,
 } from './fix-attempts.js';
-import { fixBranchName, remoteBranchExists } from './github.js';
+import { fixBranchName, remoteBranchExists } from '../integrations/github.client.js';
 import { findSpaceById, listSpaces } from './repository.js';
-import { fetchUnresolvedSentryIssues, type SentryIssue } from './sentry.js';
+import { fetchUnresolvedSentryIssues, type SentryIssue } from '../integrations/sentry.client.js';
 
 type Worker = {
   spaceId: string;

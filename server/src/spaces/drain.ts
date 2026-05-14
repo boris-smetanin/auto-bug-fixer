@@ -2,7 +2,7 @@ import path from 'node:path';
 import type { FixAttempt, FixAttemptFailureReason, Space } from '@abf/shared';
 import { config } from '../config.js';
 import { createAttemptLog } from './attempt-log.js';
-import { ClaudeRunError, runClaudeFix } from './claude-runner.js';
+import { ClaudeRunError, runClaudeFix } from '../integrations/claude.runner.js';
 import {
   markFixAttemptFailed,
   markFixAttemptPrOpened,
@@ -18,17 +18,17 @@ import {
   gitPush,
   gitReadHeadMessage,
   gitResetHard,
-} from './git.js';
+} from '../integrations/git.client.js';
 import {
   GithubApiError,
   createPullRequest,
-} from './github.js';
+} from '../integrations/github.client.js';
 import { formatPullRequestBody, formatPullRequestTitle } from './pr-body.js';
 import {
   SentryApiError,
   fetchLatestEventForIssue,
   fetchUnresolvedSentryIssues,
-} from './sentry.js';
+} from '../integrations/sentry.client.js';
 import { formatSentryPayload } from './sentry-payload.js';
 
 const COMMIT_MESSAGE_PREFIX = (sentryIssueId: string): string =>
