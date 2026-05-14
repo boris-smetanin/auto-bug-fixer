@@ -46,7 +46,8 @@ export type FixAttemptState =
   | 'queued'
   | 'in_progress'
   | 'pr_opened'
-  | 'failed';
+  | 'failed'
+  | 'escalated';
 
 export type GlobalSettings = {
   appLogRetentionDays: number;
@@ -72,6 +73,8 @@ export type FixAttempt = {
   branchName: string;
   prNumber: number | null;
   prUrl: string | null;
+  escalationIssueNumber: number | null;
+  escalationIssueUrl: string | null;
   failureReason: string | null;
   failureMessage: string | null;
   failureContext: unknown | null;
