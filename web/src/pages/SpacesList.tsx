@@ -5,6 +5,7 @@ import type { Space } from '@abf/shared';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatusPill } from '@/components/ui/status-pill';
+import { spaceStatus } from '@/lib/space-status';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { listSpaces, startFixLoop, stopFixLoop } from '@/lib/api';
 
@@ -137,7 +138,7 @@ export function SpacesList() {
                       {s.tickIntervalSeconds}s
                     </td>
                     <td className="p-4">
-                      <StatusPill status={s.fixLoopRunning ? 'running' : 'stopped'} />
+                      <StatusPill status={spaceStatus(s)} />
                     </td>
                     <td className="p-4">
                       <div className="flex items-center justify-end gap-1">

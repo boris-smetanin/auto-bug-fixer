@@ -182,6 +182,27 @@ export function resetFailedToInProgress(id: string): FixAttempt | undefined {
   return row ? rowToAttempt(row) : undefined;
 }
 
+/**
+ * On Node startup, any Fix Attempt left in `queued` or `in_progress` is an
+ * orphan — the process that owned it is gone. Transition them all to
+ * `failed:orphaned` so the loop can resume cleanly. Returns the affected
+ * row IDs.
+ */
+export function markOrphanedAttempts(message: string): string[] {
+  const rows = getDb()
+    .prepare(
+      `UPDATE fix_attempts
+       SET state = 'failed',
+           failure_reason = 'orphaned',
+           failure_message = ?,
+           ended_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+       WHERE state IN ('queued', 'in_progress')
+       RETURNING id`,
+    )
+    .all(message) as { id: string }[];
+  return rows.map((r) => r.id);
+}
+
 export function markFixAttemptFailed(
   id: string,
   reason: string,

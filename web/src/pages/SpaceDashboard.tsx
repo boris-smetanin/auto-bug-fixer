@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { FixAttemptStatePill } from '@/components/ui/fix-attempt-state-pill';
 import { StatusPill } from '@/components/ui/status-pill';
+import { spaceStatus } from '@/lib/space-status';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { LiveLogsPanel } from '@/components/LiveLogsPanel';
 import {
@@ -111,7 +112,7 @@ export function SpaceDashboard() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <StatusPill status={space.fixLoopRunning ? 'running' : 'stopped'} />
+          <StatusPill status={spaceStatus(space)} />
           <Tooltip>
             <TooltipTrigger asChild>
               <Link to={`/spaces/${space.id}/settings`}>
