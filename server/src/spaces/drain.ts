@@ -1,5 +1,5 @@
 import path from 'node:path';
-import type { FixAttempt, Space } from '@abf/shared';
+import type { FixAttempt, FixAttemptFailureReason, Space } from '@abf/shared';
 import { config } from '../config.js';
 import { createAttemptLog } from './attempt-log.js';
 import { ClaudeRunError, runClaudeFix } from './claude-runner.js';
@@ -156,15 +156,19 @@ export async function drainFixAttempt(
   }
 }
 
-function classifyError(err: unknown): { reason: string; message: string } {
+function classifyError(
+  err: unknown,
+): { reason: FixAttemptFailureReason; message: string } {
   if (err instanceof ClaudeRunError) {
-    return { reason: err.reason, message: err.message };
+    // Normalize the non-canonical `missing_api_key` to `claude_error`; preserve
+    // the message so the reader can see the underlying cause.
+    if (err.reason === 'claude_timeout') return { reason: 'claude_timeout', message: err.message };
+    return { reason: 'claude_error', message: err.message };
   }
   if (err instanceof SentryApiError) {
     return { reason: 'sentry_api_error', message: err.message };
   }
   if (err instanceof GithubApiError) {
-    // Distinguish PR-creation failures from push failures by inspecting the message.
     if (err.message.includes('creating PR')) {
       return { reason: 'pr_creation_error', message: err.message };
     }

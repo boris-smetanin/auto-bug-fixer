@@ -46,6 +46,18 @@ export type FixAttemptState =
   | 'pr_opened'
   | 'failed';
 
+export type FixAttemptFailureReason =
+  | 'clone_error'
+  | 'checkout_error'
+  | 'sentry_api_error'
+  | 'claude_timeout'
+  | 'claude_error'
+  | 'no_changes_produced'
+  | 'push_error'
+  | 'pr_creation_error'
+  | 'orphaned'
+  | 'unknown';
+
 export type FixAttempt = {
   id: string;
   spaceId: string;
