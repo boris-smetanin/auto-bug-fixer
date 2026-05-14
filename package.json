@@ -10,12 +10,14 @@
   ],
   "scripts": {
     "build": "npm run build -w shared && npm run build -w web && npm run build -w server",
+    "dev": "concurrently -k -n server,web -c blue,magenta 'npm:dev:server' 'npm:dev:web'",
     "dev:server": "npm run dev -w server",
     "dev:web": "npm run dev -w web",
     "start": "node server/dist/index.js",
     "typecheck": "npm run typecheck -ws --if-present"
   },
   "devDependencies": {
+    "concurrently": "^9.1.0",
     "typescript": "^5.7.2"
   },
   "engines": {

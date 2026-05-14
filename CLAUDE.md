@@ -17,3 +17,12 @@ Single-context repo: `CONTEXT.md` and `docs/adr/` at the repo root (created lazi
 ### Design spec
 
 [`docs/SPEC.md`](docs/SPEC.md) — comprehensive design decisions from the initial grill-with-docs session. Read this before implementation work.
+
+## Local dev
+
+Two Docker workflows:
+
+- **`docker compose up -d`** — default. Bind-mounts source, runs `tsx watch` (server) + Vite dev server (web, port 5173, with HMR). Edits on the host reflect inside the container in ~1-2s. Use `http://localhost:5173` for the UI; it proxies `/api` and `/healthz` to the Hono server on `:3000`.
+- **`docker compose -f compose.prod.yml up -d --build`** — opt-in production-ish run. Builds the full Dockerfile (multi-stage, compiled artifacts) and runs the runtime image. No hot reload; rebuild on every change. Use this only when you want parity with deployment.
+
+The `.env` file is auto-loaded by both. `Dockerfile` itself is unchanged across the two — `compose.yml` uses its `build` stage as a "container with full deps", `compose.prod.yml` uses the whole multi-stage build.
