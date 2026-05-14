@@ -154,7 +154,16 @@ export async function gitPush(
   token: string,
   signal?: AbortSignal,
 ): Promise<void> {
-  await runGit({ cwd, args: ['push', remote, branch], token, signal });
+  // --force-with-lease so retries on the same auto-fix branch overwrite the
+  // previous (failed) attempt's commits without needing a pre-delete step.
+  // Safe because auto-fix branches are owned exclusively by this app — no
+  // human ever pushes to them.
+  await runGit({
+    cwd,
+    args: ['push', '--force-with-lease', remote, branch],
+    token,
+    signal,
+  });
 }
 
 export async function gitReadHeadMessage(

@@ -13,7 +13,7 @@ import {
   listFixAttemptsBySpace,
   resetFailedToInProgress,
 } from './fix-attempts.js';
-import { deleteRemoteBranch, fixBranchName, GithubApiError } from './github.js';
+import { fixBranchName } from './github.js';
 import {
   gitCheckout,
   gitDeleteLocalBranchIfExists,
@@ -78,27 +78,9 @@ spacesRouter.post('/spaces/:id/fix-attempts/:fid/retry', async (c) => {
   const branchName = fixBranchName(original.sentryIssueId);
   const cloneDir = path.join(config.dataDir, 'cloned_repos', space.id);
 
-  // Force-delete stale remote branch (best-effort) and local branch (in case it
-  // lingered from a previous failed attempt).
-  try {
-    const result = await deleteRemoteBranch(space, branchName);
-    logEvent({
-      src: 'orchestrator',
-      msg: `retry: remote branch ${result}`,
-      data: { spaceId: space.id, branchName },
-    });
-  } catch (err) {
-    if (err instanceof GithubApiError) {
-      logEvent({
-        src: 'orchestrator',
-        level: 'warn',
-        msg: 'retry: remote branch deletion failed; continuing',
-        data: { spaceId: space.id, branchName, error: err.message },
-      });
-    } else {
-      throw err;
-    }
-  }
+  // Local branch cleanup so drain creates a fresh branch off baseBranch.
+  // No remote branch pre-delete needed — drain's push uses --force-with-lease
+  // to overwrite any leftover commits from the previous failed attempt.
   try {
     await gitCheckout(cloneDir, space.baseBranch).catch(() => undefined);
     await gitDeleteLocalBranchIfExists(cloneDir, branchName);
