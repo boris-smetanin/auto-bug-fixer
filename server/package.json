@@ -6,7 +6,7 @@
   "main": "./dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "esbuild src/index.ts --bundle --platform=node --target=node22 --format=esm --outfile=dist/index.js --packages=external --banner:js=\"import{createRequire}from'node:module';const require=createRequire(import.meta.url);\" && node -e \"require('node:fs').cpSync('src/migrations','dist/migrations',{recursive:true})\"",
+    "build": "esbuild src/index.ts --bundle --platform=node --target=node22 --format=esm --outfile=dist/index.js --packages=external --banner:js=\"import{createRequire}from'node:module';const require=createRequire(import.meta.url);\" && node -e \"const fs=require('node:fs');fs.cpSync('src/migrations','dist/migrations',{recursive:true});fs.cpSync('src/integrations/claude/plugin','dist/integrations/claude/plugin',{recursive:true});\"",
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit"
   },

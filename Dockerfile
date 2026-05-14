@@ -22,6 +22,7 @@ ENV NODE_ENV=production \
     DATA_DIR=/data \
     CORS_ORIGIN=* \
     MIGRATIONS_PATH=/app/server/dist/migrations \
+    CLAUDE_PLUGIN_PATH=/app/server/dist/integrations/claude/plugin \
     HOME=/home/node
 RUN apt-get update \
  && apt-get install -y --no-install-recommends ca-certificates curl git gosu \

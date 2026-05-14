@@ -1,0 +1,6 @@
+{
+  "name": "auto-bug-fixer-claude-plugin",
+  "version": "0.1.0",
+  "description": "Skills loaded by the auto-bug-fixer Fix Attempt runner.",
+  "author": "auto-bug-fixer"
+}
