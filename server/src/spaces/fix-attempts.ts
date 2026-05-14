@@ -98,19 +98,16 @@ export function findFixAttemptById(id: string): FixAttempt | undefined {
  * Returns the updated row, or undefined if the attempt isn't queued.
  */
 export function claimFixAttemptById(id: string): FixAttempt | undefined {
-  const db = getDb();
-  const tx = db.transaction((): FixAttemptRow | undefined => {
-    const row = db
-      .prepare("SELECT * FROM fix_attempts WHERE id = ? AND state = 'queued'")
-      .get(id) as FixAttemptRow | undefined;
-    if (!row) return undefined;
-    db.prepare(
-      "UPDATE fix_attempts SET state = 'in_progress', started_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?",
-    ).run(id);
-    return { ...row, state: 'in_progress', started_at: new Date().toISOString() };
-  });
-  const claimed = tx();
-  return claimed ? rowToAttempt(claimed) : undefined;
+  const row = getDb()
+    .prepare(
+      `UPDATE fix_attempts
+       SET state = 'in_progress',
+           started_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+       WHERE id = ? AND state = 'queued'
+       RETURNING *`,
+    )
+    .get(id) as FixAttemptRow | undefined;
+  return row ? rowToAttempt(row) : undefined;
 }
 
 export function listFixAttemptsBySpace(spaceId: string, limit = 50): FixAttempt[] {
@@ -127,25 +124,21 @@ export function listFixAttemptsBySpace(spaceId: string, limit = 50): FixAttempt[
  * `in_progress`. Returns the picked attempt, or undefined if none queued.
  */
 export function claimNextQueuedForSpace(spaceId: string): FixAttempt | undefined {
-  const db = getDb();
-  const tx = db.transaction((): FixAttemptRow | undefined => {
-    const row = db
-      .prepare(
-        "SELECT * FROM fix_attempts WHERE space_id = ? AND state = 'queued' ORDER BY created_at LIMIT 1",
-      )
-      .get(spaceId) as FixAttemptRow | undefined;
-    if (!row) return undefined;
-    db.prepare(
-      "UPDATE fix_attempts SET state = 'in_progress', started_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?",
-    ).run(row.id);
-    return {
-      ...row,
-      state: 'in_progress',
-      started_at: new Date().toISOString(),
-    };
-  });
-  const claimed = tx();
-  return claimed ? rowToAttempt(claimed) : undefined;
+  const row = getDb()
+    .prepare(
+      `UPDATE fix_attempts
+       SET state = 'in_progress',
+           started_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+       WHERE id = (
+         SELECT id FROM fix_attempts
+         WHERE space_id = ? AND state = 'queued'
+         ORDER BY created_at
+         LIMIT 1
+       )
+       RETURNING *`,
+    )
+    .get(spaceId) as FixAttemptRow | undefined;
+  return row ? rowToAttempt(row) : undefined;
 }
 
 export function markFixAttemptPrOpened(
@@ -171,13 +164,8 @@ export function markFixAttemptPrOpened(
  * or undefined if the attempt isn't currently `failed`.
  */
 export function resetFailedToInProgress(id: string): FixAttempt | undefined {
-  const db = getDb();
-  const tx = db.transaction((): FixAttemptRow | undefined => {
-    const row = db
-      .prepare("SELECT * FROM fix_attempts WHERE id = ? AND state = 'failed'")
-      .get(id) as FixAttemptRow | undefined;
-    if (!row) return undefined;
-    db.prepare(
+  const row = getDb()
+    .prepare(
       `UPDATE fix_attempts
        SET state = 'in_progress',
            failure_reason = NULL,
@@ -187,22 +175,11 @@ export function resetFailedToInProgress(id: string): FixAttempt | undefined {
            pr_url = NULL,
            started_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
            ended_at = NULL
-       WHERE id = ?`,
-    ).run(id);
-    return {
-      ...row,
-      state: 'in_progress',
-      failure_reason: null,
-      failure_message: null,
-      failure_context: null,
-      pr_number: null,
-      pr_url: null,
-      started_at: new Date().toISOString(),
-      ended_at: null,
-    };
-  });
-  const updated = tx();
-  return updated ? rowToAttempt(updated) : undefined;
+       WHERE id = ? AND state = 'failed'
+       RETURNING *`,
+    )
+    .get(id) as FixAttemptRow | undefined;
+  return row ? rowToAttempt(row) : undefined;
 }
 
 export function markFixAttemptFailed(
