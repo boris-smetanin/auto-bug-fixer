@@ -42,32 +42,6 @@ export function fixBranchName(sentryIssueId: string): string {
   return `auto-fix/sentry-${sentryIssueId}`;
 }
 
-export async function deleteRemoteBranch(
-  space: Space,
-  branchName: string,
-  signal?: AbortSignal,
-): Promise<'deleted' | 'not_found'> {
-  const url = `${GITHUB_API}/repos/${space.githubOwner}/${space.githubRepo}/git/refs/heads/${encodeURIComponent(branchName)}`;
-  const res = await fetch(url, {
-    method: 'DELETE',
-    headers: {
-      Authorization: `Bearer ${space.githubToken}`,
-      Accept: 'application/vnd.github+json',
-      'User-Agent': 'auto-bug-fixer',
-      'X-GitHub-Api-Version': '2022-11-28',
-    },
-    signal,
-  });
-  if (res.status === 204) return 'deleted';
-  if (res.status === 404 || res.status === 422) return 'not_found';
-  const body = await res.text().catch(() => '');
-  throw new GithubApiError(
-    `GitHub ${res.status} deleting branch ${branchName}`,
-    res.status,
-    body.slice(0, 500),
-  );
-}
-
 export type PullRequestCreated = {
   number: number;
   htmlUrl: string;
