@@ -1,0 +1,29 @@
+# Production-ish local run.
+#
+# Builds the full Dockerfile (multi-stage, runtime image) and runs the
+# compiled artifacts — exactly what gets deployed to a server. No bind
+# mount of source. Code changes require `docker compose -f compose.prod.yml
+# up -d --build`.
+#
+# Use this when you want parity with deployment, e.g. to verify the image
+# itself works. For day-to-day development use the default compose.yml
+# (hot reload).
+#
+# Usage:
+#   cp .env.example .env       # fill in ANTHROPIC_API_KEY
+#   docker compose -f compose.prod.yml up -d --build
+#   open http://localhost:3000
+
+services:
+  auto-bug-fixer:
+    build: .
+    image: auto-bug-fixer:prod
+    container_name: auto-bug-fixer
+    ports:
+      - "${PORT:-3000}:${PORT:-3000}"
+    volumes:
+      - ./data:/data
+    env_file:
+      - path: .env
+        required: false
+    restart: unless-stopped

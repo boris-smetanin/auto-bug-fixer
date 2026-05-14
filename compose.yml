@@ -1,26 +1,43 @@
-# Default local-dev configuration.
+# Local-dev configuration with hot reload.
 #
-# Bind-mounts ./data on the host so SQLite (`app.db`), clones
-# (`cloned_repos/`), and log files (`logs/`) are visible to the host —
-# readable in TablePlus, `tail -f`, your editor — even when the container
-# is stopped or Docker Desktop is down.
+# - Bind-mounts source from your Mac into /app inside the container so edits
+#   appear instantly. tsx watches the server, Vite HMR reloads the web UI.
+# - Anonymous volumes shadow every node_modules path so the container keeps
+#   its own Linux native bindings (e.g. better-sqlite3) independent of your
+#   host's macOS binaries — no cross-contamination on `npm install`.
+# - Uses the Dockerfile's `build` stage, which already has all deps installed.
+# - For a production-ish run (compiled artifacts, runtime image), use
+#   compose.prod.yml instead.
 #
 # Usage:
 #   cp .env.example .env       # fill in ANTHROPIC_API_KEY
-#   docker compose up -d --build
-#   docker compose logs -f auto-bug-fixer
+#   docker compose up -d       # first time: builds + installs; ~minute
+#   open http://localhost:5173 # Vite dev server with HMR (proxies /api)
+#   docker compose logs -f
 #   docker compose down
 
 services:
   auto-bug-fixer:
-    build: .
-    image: auto-bug-fixer:dev
     container_name: auto-bug-fixer
-    ports:
-      - "${PORT:-3000}:${PORT:-3000}"
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: build
+    command: sh -c "npm install && npm run dev"
     volumes:
+      - .:/app
+      # Anonymous volumes — container keeps its own node_modules with the
+      # correct Linux native bindings. Each workspace gets one because npm
+      # may not always hoist 100%.
+      - /app/node_modules
+      - /app/server/node_modules
+      - /app/web/node_modules
+      - /app/shared/node_modules
       - ./data:/data
     env_file:
       - path: .env
         required: false
+    ports:
+      - "${PORT:-3000}:${PORT:-3000}"   # Hono API + (in prod) static UI
+      - "${VITE_PORT:-5173}:${VITE_PORT:-5173}" # Vite dev server with HMR
     restart: unless-stopped
