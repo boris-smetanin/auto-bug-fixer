@@ -1,5 +1,5 @@
 import type { GlobalSettings } from '@abf/shared';
-import { getDb } from './core/db.js';
+import { getDb } from '../core/db.js';
 
 type SettingsRow = {
   id: number;

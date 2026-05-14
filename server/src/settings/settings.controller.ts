@@ -1,16 +1,17 @@
 import { Hono } from 'hono';
-import { config } from './core/config.js';
+import { config } from '../core/config.js';
 import {
+  getSettings,
   listAppLogFiles,
   readAppLogFile,
-} from './log-cleanup.js';
-import { getSettings, updateSettings } from './settings.js';
+  updateSettings,
+} from './settings.service.js';
 
-export const settingsRouter = new Hono();
+export const settingsController = new Hono();
 
-settingsRouter.get('/settings', (c) => c.json(getSettings()));
+settingsController.get('/settings', (c) => c.json(getSettings()));
 
-settingsRouter.patch('/settings', async (c) => {
+settingsController.patch('/settings', async (c) => {
   let body: Record<string, unknown>;
   try {
     body = (await c.req.json()) as Record<string, unknown>;
@@ -32,12 +33,12 @@ settingsRouter.patch('/settings', async (c) => {
   return c.json(updateSettings(fields));
 });
 
-settingsRouter.get('/app-logs', async (c) => {
+settingsController.get('/app-logs', async (c) => {
   const files = await listAppLogFiles(config.logsDir);
   return c.json(files);
 });
 
-settingsRouter.get('/app-logs/:date', async (c) => {
+settingsController.get('/app-logs/:date', async (c) => {
   const date = c.req.param('date');
   try {
     const content = await readAppLogFile(config.logsDir, date);

@@ -1,7 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { logEvent } from './core/logger.js';
-import { getSettings } from './settings.js';
+import { logEvent } from '../core/logger.js';
+import { getSettings } from './settings.repository.js';
+
+export { getSettings, updateSettings } from './settings.repository.js';
 
 const APP_LOG_PATTERN = /^app-(\d{4}-\d{2}-\d{2})\.log$/;
 const ONE_HOUR_MS = 60 * 60 * 1000;
