@@ -93,6 +93,26 @@ export function findFixAttemptById(id: string): FixAttempt | undefined {
   return row ? rowToAttempt(row) : undefined;
 }
 
+/**
+ * Atomically transition a *specific* queued attempt to in_progress.
+ * Returns the updated row, or undefined if the attempt isn't queued.
+ */
+export function claimFixAttemptById(id: string): FixAttempt | undefined {
+  const db = getDb();
+  const tx = db.transaction((): FixAttemptRow | undefined => {
+    const row = db
+      .prepare("SELECT * FROM fix_attempts WHERE id = ? AND state = 'queued'")
+      .get(id) as FixAttemptRow | undefined;
+    if (!row) return undefined;
+    db.prepare(
+      "UPDATE fix_attempts SET state = 'in_progress', started_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?",
+    ).run(id);
+    return { ...row, state: 'in_progress', started_at: new Date().toISOString() };
+  });
+  const claimed = tx();
+  return claimed ? rowToAttempt(claimed) : undefined;
+}
+
 export function listFixAttemptsBySpace(spaceId: string, limit = 50): FixAttempt[] {
   const rows = getDb()
     .prepare(
@@ -143,6 +163,46 @@ export function markFixAttemptPrOpened(
        WHERE id = ?`,
     )
     .run(prNumber, prUrl, id);
+}
+
+/**
+ * Atomically reset a failed Fix Attempt back to `in_progress` for a retry.
+ * Clears the failure fields and resets timestamps. Returns the updated row,
+ * or undefined if the attempt isn't currently `failed`.
+ */
+export function resetFailedToInProgress(id: string): FixAttempt | undefined {
+  const db = getDb();
+  const tx = db.transaction((): FixAttemptRow | undefined => {
+    const row = db
+      .prepare("SELECT * FROM fix_attempts WHERE id = ? AND state = 'failed'")
+      .get(id) as FixAttemptRow | undefined;
+    if (!row) return undefined;
+    db.prepare(
+      `UPDATE fix_attempts
+       SET state = 'in_progress',
+           failure_reason = NULL,
+           failure_message = NULL,
+           failure_context = NULL,
+           pr_number = NULL,
+           pr_url = NULL,
+           started_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
+           ended_at = NULL
+       WHERE id = ?`,
+    ).run(id);
+    return {
+      ...row,
+      state: 'in_progress',
+      failure_reason: null,
+      failure_message: null,
+      failure_context: null,
+      pr_number: null,
+      pr_url: null,
+      started_at: new Date().toISOString(),
+      ended_at: null,
+    };
+  });
+  const updated = tx();
+  return updated ? rowToAttempt(updated) : undefined;
 }
 
 export function markFixAttemptFailed(

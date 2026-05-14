@@ -36,6 +36,43 @@ export async function listFixAttempts(spaceId: string): Promise<FixAttempt[]> {
   return res.json() as Promise<FixAttempt[]>;
 }
 
+export async function getFixAttempt(
+  spaceId: string,
+  fixAttemptId: string,
+): Promise<FixAttempt> {
+  const res = await fetch(apiUrl(`/api/spaces/${spaceId}/fix-attempts/${fixAttemptId}`));
+  if (!res.ok) throw new Error(`get fix attempt failed: ${res.status}`);
+  return res.json() as Promise<FixAttempt>;
+}
+
+export async function retryFixAttempt(
+  spaceId: string,
+  fixAttemptId: string,
+): Promise<FixAttempt> {
+  const res = await fetch(
+    apiUrl(`/api/spaces/${spaceId}/fix-attempts/${fixAttemptId}/retry`),
+    { method: 'POST' },
+  );
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({ error: 'unknown' }))) as {
+      error?: string;
+    };
+    throw new Error(body.error ?? `retry failed: ${res.status}`);
+  }
+  return res.json() as Promise<FixAttempt>;
+}
+
+export async function getFixAttemptLogText(
+  spaceId: string,
+  fixAttemptId: string,
+): Promise<string> {
+  const res = await fetch(
+    apiUrl(`/api/spaces/${spaceId}/fix-attempts/${fixAttemptId}/logs`),
+  );
+  if (!res.ok) throw new Error(`get logs failed: ${res.status}`);
+  return res.text();
+}
+
 export type CreateSpaceResult =
   | { ok: true; space: Space }
   | { ok: false; errors: ValidationErrors };

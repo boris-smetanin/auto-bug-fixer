@@ -1,14 +1,17 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Eye, RotateCcw } from 'lucide-react';
 import type { FixAttempt, Space } from '@abf/shared';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { FixAttemptStatePill } from '@/components/ui/fix-attempt-state-pill';
 import { StatusPill } from '@/components/ui/status-pill';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { LiveLogsPanel } from '@/components/LiveLogsPanel';
 import {
   getSpace,
   listFixAttempts,
+  retryFixAttempt,
   startFixLoop,
   stopFixLoop,
 } from '@/lib/api';
@@ -130,7 +133,7 @@ export function SpaceDashboard() {
         </CardContent>
       </Card>
 
-      <FixAttemptsCard space={space} attempts={attempts} />
+      <FixAttemptsCard space={space} attempts={attempts} onChange={loadAttempts} />
 
       <LiveLogsPanel spaceId={space.id} />
     </main>
@@ -140,12 +143,32 @@ export function SpaceDashboard() {
 function FixAttemptsCard({
   space,
   attempts,
+  onChange,
 }: {
   space: Space;
   attempts: FixAttempt[] | null;
+  onChange: () => void;
 }) {
+  const navigate = useNavigate();
+  const [retryingId, setRetryingId] = useState<string | null>(null);
+  const [retryError, setRetryError] = useState<string | null>(null);
+
   const sentryIssueLink = (issueId: string) =>
     `${space.sentryBaseUrl}/organizations/${space.sentryOrgSlug}/issues/${issueId}/`;
+
+  const onRetry = async (a: FixAttempt) => {
+    setRetryingId(a.id);
+    setRetryError(null);
+    try {
+      await retryFixAttempt(space.id, a.id);
+      // Row mutates in place — refresh the table to pick up new state.
+      onChange();
+    } catch (err) {
+      setRetryError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setRetryingId(null);
+    }
+  };
 
   return (
     <Card>
@@ -153,6 +176,9 @@ function FixAttemptsCard({
         <CardTitle className="text-base">Fix Attempts</CardTitle>
       </CardHeader>
       <CardContent>
+        {retryError && (
+          <p className="mb-3 text-sm text-red-600">Retry failed: {retryError}</p>
+        )}
         {attempts === null && <p className="text-sm text-neutral-500">Loading…</p>}
         {attempts?.length === 0 && (
           <p className="text-sm text-neutral-500">
@@ -170,46 +196,85 @@ function FixAttemptsCard({
                 <th className="py-2 pr-4 font-medium">Branch</th>
                 <th className="py-2 pr-4 font-medium">PR</th>
                 <th className="py-2 pr-4 font-medium">Created</th>
+                <th className="py-2 pr-4 font-medium text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {attempts.map((a) => (
-                <tr key={a.id} className="border-b border-neutral-100 last:border-0 dark:border-neutral-800">
-                  <td className="py-2 pr-4">
-                    <FixAttemptStatePill state={a.state} />
-                  </td>
-                  <td className="py-2 pr-4">
-                    <a
-                      href={sentryIssueLink(a.sentryIssueId)}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-neutral-700 hover:underline dark:text-neutral-300"
-                    >
-                      #{a.sentryIssueId}
-                    </a>
-                  </td>
-                  <td className="py-2 pr-4 text-neutral-600 dark:text-neutral-400 font-mono text-xs">
-                    {a.branchName}
-                  </td>
-                  <td className="py-2 pr-4">
-                    {a.prNumber && a.prUrl ? (
+              {attempts.map((a) => {
+                const busy = retryingId === a.id;
+                return (
+                  <tr key={a.id} className="border-b border-neutral-100 last:border-0 dark:border-neutral-800">
+                    <td className="py-2 pr-4">
+                      <FixAttemptStatePill state={a.state} />
+                    </td>
+                    <td className="py-2 pr-4">
                       <a
-                        href={a.prUrl}
+                        href={sentryIssueLink(a.sentryIssueId)}
                         target="_blank"
                         rel="noreferrer"
-                        className="text-emerald-700 hover:underline dark:text-emerald-400"
+                        className="text-neutral-700 hover:underline dark:text-neutral-300"
                       >
-                        #{a.prNumber}
+                        #{a.sentryIssueId}
                       </a>
-                    ) : (
-                      <span className="text-neutral-400">—</span>
-                    )}
-                  </td>
-                  <td className="py-2 pr-4 text-neutral-600 dark:text-neutral-400">
-                    {new Date(a.createdAt).toLocaleString()}
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="py-2 pr-4 text-neutral-600 dark:text-neutral-400 font-mono text-xs">
+                      {a.branchName}
+                    </td>
+                    <td className="py-2 pr-4">
+                      {a.prNumber && a.prUrl ? (
+                        <a
+                          href={a.prUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-emerald-700 hover:underline dark:text-emerald-400"
+                        >
+                          #{a.prNumber}
+                        </a>
+                      ) : (
+                        <span className="text-neutral-400">—</span>
+                      )}
+                    </td>
+                    <td className="py-2 pr-4 text-neutral-600 dark:text-neutral-400">
+                      {new Date(a.createdAt).toLocaleString()}
+                    </td>
+                    <td className="py-2 pr-4">
+                      <div className="flex items-center justify-end gap-1">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              aria-label="View details"
+                              onClick={() =>
+                                navigate(`/spaces/${space.id}/fix-attempts/${a.id}`)
+                              }
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>View details</TooltipContent>
+                        </Tooltip>
+                        {a.state === 'failed' && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                aria-label="Retry"
+                                disabled={busy}
+                                onClick={() => void onRetry(a)}
+                              >
+                                <RotateCcw className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Retry this Fix Attempt</TooltipContent>
+                          </Tooltip>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}
