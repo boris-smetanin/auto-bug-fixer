@@ -6,7 +6,7 @@ import { ClaudeRunError, runClaudeFix } from '../integrations/claude.runner.js';
 import {
   markFixAttemptFailed,
   markFixAttemptPrOpened,
-} from './fix-attempts.js';
+} from '../fix-attempts/fix-attempts.service.js';
 import {
   GitError,
   gitAmendCommitMessage,
