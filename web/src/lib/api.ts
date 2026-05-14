@@ -76,6 +76,22 @@ export async function getFixAttempt(
   return res.json() as Promise<FixAttempt>;
 }
 
+export async function triggerFixAttempt(
+  spaceId: string,
+  sentryIssueId: string,
+): Promise<FixAttempt> {
+  const res = await fetch(apiUrl(`/api/spaces/${spaceId}/fix-attempts`), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sentryIssueId }),
+  });
+  if (res.ok) return res.json() as Promise<FixAttempt>;
+  const body = (await res.json().catch(() => ({ error: 'unknown' }))) as {
+    error?: string;
+  };
+  throw new Error(body.error ?? `trigger failed: ${res.status}`);
+}
+
 export async function retryFixAttempt(
   spaceId: string,
   fixAttemptId: string,

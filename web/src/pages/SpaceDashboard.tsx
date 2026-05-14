@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { Eye, RotateCcw, Settings } from 'lucide-react';
+import { Eye, Play, RotateCcw, Settings } from 'lucide-react';
 import type { FixAttempt, Space } from '@abf/shared';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { FixAttemptStatePill } from '@/components/ui/fix-attempt-state-pill';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { StatusPill } from '@/components/ui/status-pill';
 import { spaceStatus } from '@/lib/space-status';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -15,7 +17,9 @@ import {
   retryFixAttempt,
   startFixLoop,
   stopFixLoop,
+  triggerFixAttempt,
 } from '@/lib/api';
+import { parseSentryIssueIdentifier } from '@/lib/sentry-issue';
 
 const ATTEMPT_POLL_MS = 5000;
 
@@ -146,10 +150,82 @@ export function SpaceDashboard() {
         </CardContent>
       </Card>
 
+      <ManualTriggerCard space={space} onTriggered={loadAttempts} />
+
       <FixAttemptsCard space={space} attempts={attempts} onChange={loadAttempts} />
 
       <LiveLogsPanel spaceId={space.id} />
     </main>
+  );
+}
+
+function ManualTriggerCard({
+  space,
+  onTriggered,
+}: {
+  space: Space;
+  onTriggered: () => void;
+}) {
+  const [input, setInput] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+
+  const onSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setSuccess(null);
+    const parsed = parseSentryIssueIdentifier(input);
+    if (!parsed) {
+      setError(
+        'Could not parse a Sentry Issue ID from that input. Paste an ID (e.g. 4321) or a Sentry Issue URL.',
+      );
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const attempt = await triggerFixAttempt(space.id, parsed);
+      setSuccess(`Triggered Fix Attempt for Sentry Issue ${attempt.sentryIssueId}.`);
+      setInput('');
+      onTriggered();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Trigger a Fix Attempt</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={onSubmit} className="space-y-2">
+          <Label htmlFor="manual-issue">Sentry Issue ID or URL</Label>
+          <div className="flex items-center gap-2">
+            <Input
+              id="manual-issue"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="4321  —  or  —  https://acme.sentry.io/issues/4321/"
+              disabled={submitting}
+              className="flex-1"
+            />
+            <Button type="submit" disabled={submitting || !input.trim()} className="gap-1.5">
+              <Play className="h-4 w-4 fill-current" />
+              {submitting ? 'Triggering…' : 'Trigger'}
+            </Button>
+          </div>
+          <p className="text-xs text-neutral-500">
+            Runs immediately, independent of the Fix Loop. Each Sentry Issue can have at most
+            one Fix Attempt — Retry the existing row from the Fix Attempts table if it failed.
+          </p>
+          {error && <p className="text-sm text-red-600">{error}</p>}
+          {success && <p className="text-sm text-emerald-700 dark:text-emerald-400">{success}</p>}
+        </form>
+      </CardContent>
+    </Card>
   );
 }
 
