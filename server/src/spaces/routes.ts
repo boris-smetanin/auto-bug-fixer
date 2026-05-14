@@ -1,8 +1,9 @@
 import { randomUUID } from 'node:crypto';
-import { rm, writeFile } from 'node:fs/promises';
+import { rename, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import fs from 'node:fs';
 import { Hono } from 'hono';
+import type { SpaceInput } from '@abf/shared';
 import { config } from '../config.js';
 import { logEvent } from '../logger.js';
 import { CloneError, cloneRepoWithToken } from './clone.js';
@@ -21,10 +22,12 @@ import {
 } from './git.js';
 import { parseSpaceInput } from './parse.js';
 import {
+  deleteSpace,
   findSpaceById,
   insertSpace,
   listSpaces,
   setFixLoopRunning,
+  updateSpace,
 } from './repository.js';
 import { validateCredentials } from './validators.js';
 import { startWorker, stopWorker } from './worker.js';
@@ -37,6 +40,141 @@ spacesRouter.get('/spaces/:id', (c) => {
   const space = findSpaceById(c.req.param('id'));
   if (!space) return c.json({ error: 'not found' }, 404);
   return c.json(space);
+});
+
+spacesRouter.patch('/spaces/:id', async (c) => {
+  const signal = c.req.raw.signal;
+  const space = findSpaceById(c.req.param('id'));
+  if (!space) return c.json({ error: 'not found' }, 404);
+
+  let body: Record<string, unknown>;
+  try {
+    body = (await c.req.json()) as Record<string, unknown>;
+  } catch {
+    return c.json({ errors: { body: 'Invalid JSON' } }, 400);
+  }
+
+  // Merge body with existing Space. Empty string / missing = keep existing.
+  // Tokens specifically: an empty string means "keep my old token", so the
+  // user doesn't have to re-paste secrets on every edit.
+  const pick = (key: string): string | undefined => {
+    const v = body[key];
+    return typeof v === 'string' && v.trim() !== '' ? v.trim() : undefined;
+  };
+  const merged: SpaceInput = {
+    name: pick('name') ?? space.name,
+    githubOwner: pick('githubOwner') ?? space.githubOwner,
+    githubRepo: pick('githubRepo') ?? space.githubRepo,
+    githubToken: pick('githubToken') ?? space.githubToken,
+    baseBranch: pick('baseBranch') ?? space.baseBranch,
+    sentryBaseUrl: pick('sentryBaseUrl') ?? space.sentryBaseUrl,
+    sentryOrgSlug: pick('sentryOrgSlug') ?? space.sentryOrgSlug,
+    sentryProjectSlug: pick('sentryProjectSlug') ?? space.sentryProjectSlug,
+    sentryAuthToken: pick('sentryAuthToken') ?? space.sentryAuthToken,
+    extraSentryQuery:
+      typeof body.extraSentryQuery === 'string'
+        ? body.extraSentryQuery
+        : space.extraSentryQuery,
+    tickIntervalSeconds:
+      body.tickIntervalSeconds === undefined || body.tickIntervalSeconds === null || body.tickIntervalSeconds === ''
+        ? space.tickIntervalSeconds
+        : Number(body.tickIntervalSeconds),
+  };
+
+  if (
+    !Number.isInteger(merged.tickIntervalSeconds) ||
+    (merged.tickIntervalSeconds as number) <= 0
+  ) {
+    return c.json(
+      { errors: { tickIntervalSeconds: 'Must be a positive integer' } },
+      400,
+    );
+  }
+
+  const credErrors = await validateCredentials(merged, signal);
+  if (credErrors) return c.json({ errors: credErrors }, 400);
+
+  const repoChanged =
+    merged.githubOwner !== space.githubOwner ||
+    merged.githubRepo !== space.githubRepo;
+
+  if (repoChanged) {
+    // Clone to a staging dir first, then atomically swap. If the new clone
+    // fails, the old clone stays intact.
+    const oldClone = path.join(config.dataDir, 'cloned_repos', space.id);
+    const newClone = path.join(config.dataDir, 'cloned_repos', `${space.id}.new`);
+    try {
+      await cloneRepoWithToken({
+        owner: merged.githubOwner,
+        repo: merged.githubRepo,
+        token: merged.githubToken,
+        destDir: newClone,
+        signal,
+      });
+    } catch (err) {
+      if (err instanceof CloneError && err.aborted) return c.body(null, 499);
+      await rm(newClone, { recursive: true, force: true }).catch(() => undefined);
+      const message = err instanceof Error ? err.message : String(err);
+      return c.json({ errors: { githubRepo: `Re-clone failed: ${message}` } }, 400);
+    }
+    await rm(oldClone, { recursive: true, force: true }).catch(() => undefined);
+    await rename(newClone, oldClone);
+  }
+
+  const updated = updateSpace(space.id, {
+    id: space.id,
+    name: merged.name ?? space.name,
+    githubOwner: merged.githubOwner,
+    githubRepo: merged.githubRepo,
+    githubToken: merged.githubToken,
+    baseBranch: merged.baseBranch ?? space.baseBranch,
+    sentryBaseUrl: merged.sentryBaseUrl ?? space.sentryBaseUrl,
+    sentryOrgSlug: merged.sentryOrgSlug,
+    sentryProjectSlug: merged.sentryProjectSlug,
+    sentryAuthToken: merged.sentryAuthToken,
+    extraSentryQuery: merged.extraSentryQuery ?? '',
+    tickIntervalSeconds: merged.tickIntervalSeconds ?? 60,
+  });
+  return c.json(updated);
+});
+
+spacesRouter.delete('/spaces/:id', async (c) => {
+  const space = findSpaceById(c.req.param('id'));
+  if (!space) return c.json({ error: 'not found' }, 404);
+
+  if (space.fixLoopRunning) {
+    return c.json(
+      { error: 'Fix Loop is running. Stop it before deleting the Space.' },
+      409,
+    );
+  }
+  if (hasInProgressAttempt(space.id)) {
+    return c.json(
+      { error: 'A Fix Attempt is currently in progress. Wait for it to finish.' },
+      409,
+    );
+  }
+
+  // Defense in depth: ensure any lingering worker timer is cleared.
+  stopWorker(space.id);
+
+  await rm(path.join(config.dataDir, 'cloned_repos', space.id), {
+    recursive: true,
+    force: true,
+  }).catch(() => undefined);
+  await rm(path.join(config.logsDir, space.id), {
+    recursive: true,
+    force: true,
+  }).catch(() => undefined);
+
+  deleteSpace(space.id);
+
+  logEvent({
+    src: 'orchestrator',
+    msg: 'space deleted',
+    data: { spaceId: space.id, name: space.name },
+  });
+  return c.body(null, 204);
 });
 
 spacesRouter.get('/spaces/:id/fix-attempts', (c) => {

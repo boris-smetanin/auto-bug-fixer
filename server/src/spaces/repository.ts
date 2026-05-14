@@ -71,6 +71,31 @@ export function findSpaceById(id: string): Space | undefined {
   return row ? rowToSpace(row) : undefined;
 }
 
+export function updateSpace(id: string, fields: NewSpace): Space {
+  const stmt = getDb().prepare(`
+    UPDATE spaces SET
+      name = @name,
+      github_owner = @githubOwner,
+      github_repo = @githubRepo,
+      github_token = @githubToken,
+      base_branch = @baseBranch,
+      sentry_base_url = @sentryBaseUrl,
+      sentry_org_slug = @sentryOrgSlug,
+      sentry_project_slug = @sentryProjectSlug,
+      sentry_auth_token = @sentryAuthToken,
+      extra_sentry_query = @extraSentryQuery,
+      tick_interval_seconds = @tickIntervalSeconds,
+      updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+    WHERE id = @id
+    RETURNING *
+  `);
+  return rowToSpace(stmt.get({ ...fields, id }) as SpaceRow);
+}
+
+export function deleteSpace(id: string): void {
+  getDb().prepare('DELETE FROM spaces WHERE id = ?').run(id);
+}
+
 export function setFixLoopRunning(id: string, running: boolean): void {
   getDb()
     .prepare(
