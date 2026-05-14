@@ -9,8 +9,11 @@ import { logEvent } from '../logger.js';
 import { CloneError, cloneRepoWithToken } from './clone.js';
 import { drainFixAttempt } from './drain.js';
 import {
+  claimFixAttemptById,
   findFixAttemptById,
+  hasAttemptForSentryIssue,
   hasInProgressAttempt,
+  insertQueuedFixAttempt,
   listFixAttemptsBySpace,
   resetFailedToInProgress,
 } from './fix-attempts.js';
@@ -181,6 +184,74 @@ spacesRouter.get('/spaces/:id/fix-attempts', (c) => {
   const space = findSpaceById(c.req.param('id'));
   if (!space) return c.json({ error: 'not found' }, 404);
   return c.json(listFixAttemptsBySpace(space.id));
+});
+
+spacesRouter.post('/spaces/:id/fix-attempts', async (c) => {
+  const space = findSpaceById(c.req.param('id'));
+  if (!space) return c.json({ error: 'not found' }, 404);
+
+  let body: Record<string, unknown>;
+  try {
+    body = (await c.req.json()) as Record<string, unknown>;
+  } catch {
+    return c.json({ error: 'Invalid JSON' }, 400);
+  }
+
+  const raw = body.sentryIssueId;
+  if (typeof raw !== 'string' || raw.trim() === '') {
+    return c.json({ error: 'sentryIssueId is required' }, 400);
+  }
+  const sentryIssueId = raw.trim();
+
+  if (hasAttemptForSentryIssue(space.id, sentryIssueId)) {
+    // Dedup: a row already exists for (space, issue). The user must use the
+    // retry endpoint if it's failed; otherwise the loop will handle it.
+    return c.json(
+      {
+        error:
+          'A Fix Attempt already exists for this Sentry Issue. Use Retry on the failed row, or wait for the in-flight attempt.',
+      },
+      409,
+    );
+  }
+  if (hasInProgressAttempt(space.id)) {
+    return c.json(
+      { error: 'Another Fix Attempt is currently in progress for this Space.' },
+      409,
+    );
+  }
+
+  const newId = randomUUID();
+  const logFilePath = path.join(config.logsDir, space.id, `${newId}.log`);
+  const branch = fixBranchName(sentryIssueId);
+  insertQueuedFixAttempt({
+    id: newId,
+    spaceId: space.id,
+    sentryIssueId,
+    branchName: branch,
+    logFilePath,
+  });
+  const claimed = claimFixAttemptById(newId);
+  if (!claimed) {
+    return c.json({ error: 'failed to claim new attempt' }, 500);
+  }
+
+  logEvent({
+    src: 'orchestrator',
+    msg: 'fix attempt manually triggered',
+    data: { spaceId: space.id, fixAttemptId: newId, sentryIssueId },
+  });
+
+  void drainFixAttempt(space, claimed).catch((err) => {
+    logEvent({
+      src: 'orchestrator',
+      level: 'error',
+      msg: 'manual trigger drain crashed',
+      data: { spaceId: space.id, fixAttemptId: newId, error: String(err) },
+    });
+  });
+
+  return c.json(claimed, 201);
 });
 
 spacesRouter.get('/spaces/:id/fix-attempts/:fid', (c) => {
