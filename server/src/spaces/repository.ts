@@ -1,5 +1,5 @@
 import type { Space } from '@abf/shared';
-import { getDb } from '../db.js';
+import { getDb } from '../core/db.js';
 
 type SpaceRow = {
   id: string;

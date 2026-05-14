@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { logEvent } from './logger.js';
+import { logEvent } from './core/logger.js';
 import { getSettings } from './settings.js';
 
 const APP_LOG_PATTERN = /^app-(\d{4}-\d{2}-\d{2})\.log$/;

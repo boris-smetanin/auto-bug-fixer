@@ -1,5 +1,5 @@
 import type { FixAttempt, FixAttemptState } from '@abf/shared';
-import { getDb } from '../db.js';
+import { getDb } from '../core/db.js';
 
 type FixAttemptRow = {
   id: string;
