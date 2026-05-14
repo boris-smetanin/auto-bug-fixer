@@ -10,9 +10,9 @@ import { settingsRouter } from './settings-routes.js';
 import { logsRouter } from './spaces/logs-routes.js';
 import { fixAttemptsController } from './fix-attempts/fix-attempts.controller.js';
 import { markOrphanedAttempts } from './fix-attempts/fix-attempts.service.js';
-import { spacesRouter } from './spaces/routes.js';
+import { fixLoopController } from './fix-loop/fix-loop.controller.js';
+import { resumeRunningLoops, stopAllLoops } from './fix-loop/fix-loop.service.js';
 import { spacesController } from './spaces/spaces.controller.js';
-import { resumeRunningSpaces, stopAllWorkers } from './spaces/worker.js';
 import { staticHandler } from './core/static.js';
 
 initDb({ dataDir: config.dataDir, migrationsPath: config.migrationsPath });
@@ -33,7 +33,7 @@ if (orphans.length > 0) {
   });
 }
 
-resumeRunningSpaces();
+resumeRunningLoops();
 
 startLogCleanupTimer(config.logsDir);
 
@@ -45,7 +45,7 @@ app.get('/healthz', (c) => c.json<HealthResponse>({ ok: true }));
 
 app.route('/api', spacesController);
 app.route('/api', fixAttemptsController);
-app.route('/api', spacesRouter);
+app.route('/api', fixLoopController);
 app.route('/api', logsRouter);
 app.route('/api', settingsRouter);
 
@@ -61,7 +61,7 @@ server.headersTimeout = 11 * 60 * 1000;
 
 const shutdown = (signal: string): void => {
   logEvent({ src: 'orchestrator', msg: `received ${signal}, shutting down` });
-  stopAllWorkers();
+  stopAllLoops();
   stopLogCleanupTimer();
   server.close(() => {
     closeDb();

@@ -3,7 +3,6 @@ import path from 'node:path';
 import type { Space } from '@abf/shared';
 import { config } from '../core/config.js';
 import { logEvent } from '../core/logger.js';
-import { drainFixAttempt } from './drain.js';
 import {
   claimNextQueuedForSpace,
   hasAttemptForSentryIssue,
@@ -11,8 +10,9 @@ import {
   insertQueuedFixAttempt,
 } from '../fix-attempts/fix-attempts.service.js';
 import { fixBranchName, remoteBranchExists } from '../integrations/github.client.js';
-import { findSpaceById, listSpaces } from './spaces.repository.js';
 import { fetchUnresolvedSentryIssues, type SentryIssue } from '../integrations/sentry.client.js';
+import { drainFixAttempt } from '../spaces/drain.js';
+import { findSpace, listAllSpaces } from '../spaces/spaces.service.js';
 
 type Worker = {
   spaceId: string;
@@ -22,7 +22,7 @@ type Worker = {
 
 const workers = new Map<string, Worker>();
 
-export function startWorker(initialSpace: Space): void {
+export function startLoop(initialSpace: Space): void {
   if (workers.has(initialSpace.id)) return;
 
   const spaceId = initialSpace.id;
@@ -58,7 +58,7 @@ export function startWorker(initialSpace: Space): void {
   });
 }
 
-export function stopWorker(spaceId: string): void {
+export function stopLoop(spaceId: string): void {
   const w = workers.get(spaceId);
   if (!w) return;
   clearInterval(w.timer);
@@ -70,22 +70,22 @@ export function stopWorker(spaceId: string): void {
   });
 }
 
-export function stopAllWorkers(): void {
-  for (const id of Array.from(workers.keys())) stopWorker(id);
+export function stopAllLoops(): void {
+  for (const id of Array.from(workers.keys())) stopLoop(id);
 }
 
-export function isWorkerRunning(spaceId: string): boolean {
+export function isLoopRunning(spaceId: string): boolean {
   return workers.has(spaceId);
 }
 
-export function resumeRunningSpaces(): void {
-  for (const space of listSpaces()) {
-    if (space.fixLoopRunning) startWorker(space);
+export function resumeRunningLoops(): void {
+  for (const space of listAllSpaces()) {
+    if (space.fixLoopRunning) startLoop(space);
   }
 }
 
 async function runTick(spaceId: string): Promise<void> {
-  const space = findSpaceById(spaceId);
+  const space = findSpace(spaceId);
   if (!space) {
     logEvent({
       src: 'orchestrator',
@@ -93,7 +93,7 @@ async function runTick(spaceId: string): Promise<void> {
       msg: 'space disappeared during tick; stopping worker',
       data: { spaceId },
     });
-    stopWorker(spaceId);
+    stopLoop(spaceId);
     return;
   }
 
