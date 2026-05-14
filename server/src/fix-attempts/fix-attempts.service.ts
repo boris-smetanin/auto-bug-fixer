@@ -9,8 +9,8 @@ import {
   GitError,
   gitCheckout,
   gitDeleteLocalBranchIfExists,
-} from '../integrations/git.client.js';
-import { fixBranchName } from '../integrations/github.client.js';
+} from '../integrations/git/git.client.js';
+import { fixBranchName } from '../integrations/github/github.client.js';
 import { drainFixAttempt } from '../drain/drain.service.js';
 import {
   claimFixAttemptById,

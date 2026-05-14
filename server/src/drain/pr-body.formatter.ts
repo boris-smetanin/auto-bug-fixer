@@ -1,5 +1,5 @@
 import type { Space } from '@abf/shared';
-import type { SentryEvent, SentryIssue } from '../integrations/sentry.client.js';
+import type { SentryEvent, SentryIssue } from '../integrations/sentry/sentry.client.js';
 
 export function formatPullRequestTitle(
   issue: SentryIssue,

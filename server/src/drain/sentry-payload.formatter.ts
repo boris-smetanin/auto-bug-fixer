@@ -1,4 +1,4 @@
-import type { SentryEvent, SentryIssue } from '../integrations/sentry.client.js';
+import type { SentryEvent, SentryIssue } from '../integrations/sentry/sentry.client.js';
 
 const REDACTED_HEADERS = new Set(['cookie', 'authorization', 'x-api-key']);
 const PII_TAGS = new Set(['user', 'user.id', 'user.email', 'user.ip', 'user.username']);
