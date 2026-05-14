@@ -11,7 +11,7 @@ import {
   gitDeleteLocalBranchIfExists,
 } from '../integrations/git.client.js';
 import { fixBranchName } from '../integrations/github.client.js';
-import { drainFixAttempt } from '../spaces/drain.js';
+import { drainFixAttempt } from '../drain/drain.service.js';
 import {
   claimFixAttemptById,
   findFixAttemptById,

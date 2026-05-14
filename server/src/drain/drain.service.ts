@@ -1,7 +1,7 @@
 import path from 'node:path';
 import type { FixAttempt, FixAttemptFailureReason, Space } from '@abf/shared';
 import { config } from '../core/config.js';
-import { createAttemptLog } from './attempt-log.js';
+import { createAttemptLog } from '../logs/attempt-log.js';
 import { ClaudeRunError, runClaudeFix } from '../integrations/claude.runner.js';
 import {
   markFixAttemptFailed,
@@ -23,13 +23,13 @@ import {
   GithubApiError,
   createPullRequest,
 } from '../integrations/github.client.js';
-import { formatPullRequestBody, formatPullRequestTitle } from './pr-body.js';
+import { formatPullRequestBody, formatPullRequestTitle } from './pr-body.formatter.js';
 import {
   SentryApiError,
   fetchLatestEventForIssue,
   fetchUnresolvedSentryIssues,
 } from '../integrations/sentry.client.js';
-import { formatSentryPayload } from './sentry-payload.js';
+import { formatSentryPayload } from './sentry-payload.formatter.js';
 
 const COMMIT_MESSAGE_PREFIX = (sentryIssueId: string): string =>
   `auto-fix(sentry-${sentryIssueId}): `;
