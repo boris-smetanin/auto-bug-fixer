@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Eye, Play, Square } from 'lucide-react';
+import { Eye, Play, Settings as SettingsIcon, Square } from 'lucide-react';
 import type { Space } from '@abf/shared';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -65,11 +65,23 @@ export function SpacesList() {
     <main className="mx-auto max-w-5xl p-8">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-semibold tracking-tight">Spaces</h1>
-        <Link to="/spaces/new">
-          <Button className="bg-emerald-600 text-white hover:bg-emerald-500 dark:bg-emerald-500 dark:text-white dark:hover:bg-emerald-400">
-            Add Space
-          </Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Link to="/settings">
+                <Button size="icon" variant="ghost" aria-label="Global settings">
+                  <SettingsIcon className="h-4 w-4" />
+                </Button>
+              </Link>
+            </TooltipTrigger>
+            <TooltipContent>Global settings</TooltipContent>
+          </Tooltip>
+          <Link to="/spaces/new">
+            <Button className="bg-emerald-600 text-white hover:bg-emerald-500 dark:bg-emerald-500 dark:text-white dark:hover:bg-emerald-400">
+              Add Space
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {error && (

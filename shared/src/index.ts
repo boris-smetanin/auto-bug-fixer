@@ -48,6 +48,10 @@ export type FixAttemptState =
   | 'pr_opened'
   | 'failed';
 
+export type GlobalSettings = {
+  appLogRetentionDays: number;
+};
+
 export type FixAttemptFailureReason =
   | 'clone_error'
   | 'checkout_error'
