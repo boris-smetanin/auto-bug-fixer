@@ -18,6 +18,37 @@ export async function getSpace(id: string): Promise<Space> {
   return res.json() as Promise<Space>;
 }
 
+export type UpdateSpaceResult =
+  | { ok: true; space: Space }
+  | { ok: false; errors: ValidationErrors };
+
+export async function updateSpace(
+  id: string,
+  input: Partial<SpaceInput>,
+): Promise<UpdateSpaceResult> {
+  const res = await fetch(apiUrl(`/api/spaces/${id}`), {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  if (res.ok) return { ok: true, space: (await res.json()) as Space };
+  if (res.status === 400) {
+    const body = (await res.json()) as { errors: ValidationErrors };
+    return { ok: false, errors: body.errors };
+  }
+  throw new Error(`PATCH /api/spaces/${id} unexpected ${res.status}`);
+}
+
+export async function deleteSpace(id: string): Promise<void> {
+  const res = await fetch(apiUrl(`/api/spaces/${id}`), { method: 'DELETE' });
+  if (res.status === 204) return;
+  if (res.status === 409) {
+    const body = (await res.json()) as { error?: string };
+    throw new Error(body.error ?? 'cannot delete while loop is running');
+  }
+  throw new Error(`DELETE /api/spaces/${id} failed: ${res.status}`);
+}
+
 export async function startFixLoop(id: string): Promise<Space> {
   const res = await fetch(apiUrl(`/api/spaces/${id}/loop/start`), { method: 'POST' });
   if (!res.ok) throw new Error(`start loop failed: ${res.status}`);

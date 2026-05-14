@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { Eye, RotateCcw } from 'lucide-react';
+import { Eye, RotateCcw, Settings } from 'lucide-react';
 import type { FixAttempt, Space } from '@abf/shared';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -110,7 +110,19 @@ export function SpaceDashboard() {
             {space.githubOwner}/{space.githubRepo} · base: {space.baseBranch}
           </p>
         </div>
-        <StatusPill status={space.fixLoopRunning ? 'running' : 'stopped'} />
+        <div className="flex items-center gap-2">
+          <StatusPill status={space.fixLoopRunning ? 'running' : 'stopped'} />
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Link to={`/spaces/${space.id}/settings`}>
+                <Button size="icon" variant="ghost" aria-label="Space settings">
+                  <Settings className="h-4 w-4" />
+                </Button>
+              </Link>
+            </TooltipTrigger>
+            <TooltipContent>Settings</TooltipContent>
+          </Tooltip>
+        </div>
       </div>
 
       <Card>
