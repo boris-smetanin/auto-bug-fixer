@@ -18,6 +18,10 @@ Single-context repo: `CONTEXT.md` and `docs/adr/` at the repo root (created lazi
 
 [`docs/SPEC.md`](docs/SPEC.md) — comprehensive design decisions from the initial grill-with-docs session. Read this before implementation work.
 
+### Server architecture
+
+[`docs/architecture.md`](docs/architecture.md) — directory layout, three-layer convention (controller/service/repository), call-graph rule, and a "where does this code go?" decision rule. Read this before adding new server code.
+
 ## Local dev
 
 Two Docker workflows:
