@@ -1,9 +1,11 @@
+import { readFile, rm } from 'node:fs/promises';
 import path from 'node:path';
 import type { FixAttempt, FixAttemptFailureReason, Space } from '@abf/shared';
 import { config } from '../core/config.js';
 import { createAttemptLog } from '../logs/attempt-log.js';
 import { ClaudeRunError, runClaudeFix } from '../integrations/claude/claude.runner.js';
 import {
+  markFixAttemptEscalated,
   markFixAttemptFailed,
   markFixAttemptPrOpened,
 } from '../fix-attempts/fix-attempts.service.js';
@@ -21,6 +23,7 @@ import {
 } from '../integrations/git/git.client.js';
 import {
   GithubApiError,
+  createIssue,
   createPullRequest,
 } from '../integrations/github/github.client.js';
 import { formatPullRequestBody, formatPullRequestTitle } from './pr-body.formatter.js';
@@ -33,6 +36,23 @@ import { formatSentryPayload } from './sentry-payload.formatter.js';
 
 const COMMIT_MESSAGE_PREFIX = (sentryIssueId: string): string =>
   `auto-fix(sentry-${sentryIssueId}): `;
+
+function formatEscalationIssueBody(args: {
+  escalationBody: string;
+  issue: { shortId: string; permalink: string };
+  attemptId: string;
+}): string {
+  return [
+    args.escalationBody.trim(),
+    '',
+    '---',
+    '',
+    `**Sentry Issue:** [${args.issue.shortId}](${args.issue.permalink})`,
+    `**Fix Attempt ID:** \`${args.attemptId}\``,
+    '',
+    'Filed automatically by auto-bug-fixer. The agent concluded the root cause is outside this repository — see the diagnostic write-up above for evidence and suspected next destination.',
+  ].join('\n');
+}
 
 export async function drainFixAttempt(
   space: Space,
@@ -102,6 +122,39 @@ export async function drainFixAttempt(
     });
 
     if (commits.length === 0) {
+      const escalationPath = path.join(cloneDir, '.abf', 'escalation.md');
+      const escalationBody = await readFile(escalationPath, 'utf-8').catch(() => undefined);
+
+      if (escalationBody !== undefined) {
+        log.log('info', 'orchestrator', 'escalation file detected; opening GitHub issue', {
+          escalationLength: escalationBody.length,
+        });
+        const issueTitle = `[auto-bug-fixer] Cross-service escalation: ${issue.title}`;
+        const issueBody = formatEscalationIssueBody({
+          escalationBody,
+          issue,
+          attemptId: attempt.id,
+        });
+        const ghIssue = await createIssue(space, {
+          title: issueTitle,
+          body: issueBody,
+          labels: ['auto-bug-fixer/escalation'],
+        });
+        markFixAttemptEscalated(attempt.id, ghIssue.number, ghIssue.htmlUrl);
+        log.log('info', 'orchestrator', 'fix attempt complete (escalated)', {
+          issueNumber: ghIssue.number,
+          issueUrl: ghIssue.htmlUrl,
+        });
+        // Clean up so the .abf/ marker doesn't haunt the next attempt's
+        // working tree (untracked files survive checkout + reset --hard).
+        await rm(path.join(cloneDir, '.abf'), { recursive: true, force: true }).catch(
+          () => undefined,
+        );
+        await gitCheckout(cloneDir, space.baseBranch).catch(() => undefined);
+        await gitDeleteLocalBranchIfExists(cloneDir, attempt.branchName);
+        return;
+      }
+
       markFixAttemptFailed(
         attempt.id,
         'no_changes_produced',

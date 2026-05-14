@@ -9,6 +9,8 @@ type FixAttemptRow = {
   branch_name: string;
   pr_number: number | null;
   pr_url: string | null;
+  escalation_issue_number: number | null;
+  escalation_issue_url: string | null;
   failure_reason: string | null;
   failure_message: string | null;
   failure_context: string | null;
@@ -27,6 +29,8 @@ function rowToAttempt(row: FixAttemptRow): FixAttempt {
     branchName: row.branch_name,
     prNumber: row.pr_number,
     prUrl: row.pr_url,
+    escalationIssueNumber: row.escalation_issue_number,
+    escalationIssueUrl: row.escalation_issue_url,
     failureReason: row.failure_reason,
     failureMessage: row.failure_message,
     failureContext: row.failure_context ? JSON.parse(row.failure_context) : null,
@@ -133,7 +137,12 @@ export function claimNextQueuedForSpace(spaceId: string): FixAttempt | undefined
   return row ? rowToAttempt(row) : undefined;
 }
 
-export function resetFailedToInProgress(id: string): FixAttempt | undefined {
+/**
+ * Reset a terminal Fix Attempt (failed OR escalated) back to in_progress for
+ * a retry. Mutates the existing row in place; preserves the single-source-of-
+ * truth invariant (one row per (Space, Sentry Issue)).
+ */
+export function resetTerminalToInProgress(id: string): FixAttempt | undefined {
   const row = getDb()
     .prepare(
       `UPDATE fix_attempts
@@ -143,9 +152,11 @@ export function resetFailedToInProgress(id: string): FixAttempt | undefined {
            failure_context = NULL,
            pr_number = NULL,
            pr_url = NULL,
+           escalation_issue_number = NULL,
+           escalation_issue_url = NULL,
            started_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
            ended_at = NULL
-       WHERE id = ? AND state = 'failed'
+       WHERE id = ? AND state IN ('failed', 'escalated')
        RETURNING *`,
     )
     .get(id) as FixAttemptRow | undefined;
@@ -167,6 +178,23 @@ export function markFixAttemptPrOpened(
        WHERE id = ?`,
     )
     .run(prNumber, prUrl, id);
+}
+
+export function markFixAttemptEscalated(
+  id: string,
+  issueNumber: number,
+  issueUrl: string,
+): void {
+  getDb()
+    .prepare(
+      `UPDATE fix_attempts
+       SET state = 'escalated',
+           escalation_issue_number = ?,
+           escalation_issue_url = ?,
+           ended_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+       WHERE id = ?`,
+    )
+    .run(issueNumber, issueUrl, id);
 }
 
 export function markFixAttemptFailed(

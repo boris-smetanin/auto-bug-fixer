@@ -22,6 +22,12 @@ const styles: Record<FixAttemptState, { bg: string; dot: string; label: string }
     dot: 'bg-red-500',
     label: 'failed',
   },
+  // Placeholder styling — #52 will style this properly.
+  escalated: {
+    bg: 'bg-orange-100 text-orange-800 dark:bg-orange-950 dark:text-orange-300',
+    dot: 'bg-orange-500',
+    label: 'escalated',
+  },
 };
 
 export function FixAttemptStatePill({

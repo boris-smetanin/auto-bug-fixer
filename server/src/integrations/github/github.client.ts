@@ -82,3 +82,48 @@ export async function createPullRequest(
   const data = (await res.json()) as { number: number; html_url: string };
   return { number: data.number, htmlUrl: data.html_url };
 }
+
+export type IssueCreated = {
+  number: number;
+  htmlUrl: string;
+};
+
+/**
+ * Open a GitHub Issue on the Space's repo. Used by the drain to file an
+ * escalation when the agent concludes the bug's root cause is outside this
+ * repo (the agent writes .abf/escalation.md; the drain reads it and calls
+ * this).
+ */
+export async function createIssue(
+  space: Space,
+  args: { title: string; body: string; labels?: string[] },
+  signal?: AbortSignal,
+): Promise<IssueCreated> {
+  const url = `${GITHUB_API}/repos/${space.githubOwner}/${space.githubRepo}/issues`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${space.githubToken}`,
+      Accept: 'application/vnd.github+json',
+      'User-Agent': 'auto-bug-fixer',
+      'X-GitHub-Api-Version': '2022-11-28',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      title: args.title,
+      body: args.body,
+      labels: args.labels,
+    }),
+    signal,
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new GithubApiError(
+      `GitHub ${res.status} creating issue`,
+      res.status,
+      body.slice(0, 500),
+    );
+  }
+  const data = (await res.json()) as { number: number; html_url: string };
+  return { number: data.number, htmlUrl: data.html_url };
+}

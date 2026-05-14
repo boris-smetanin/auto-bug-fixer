@@ -25,12 +25,16 @@ The branch on a **Space**'s GitHub repo that **Fixes** are opened against; user-
 _Avoid_: master, main, default branch, target branch
 
 **Fix Attempt**:
-The lifecycle record of the app trying to fix one **Sentry Issue** within one **Space**. Produces a **Fix** on success or is marked failed.
+The lifecycle record of the app trying to fix one **Sentry Issue** within one **Space**. Produces a **Fix** when the bug is fixable here, an **Escalation** when the root cause is outside this repo, or is marked failed.
 _Avoid_: run, job, task
 
 **Fix**:
 The pull request a successful **Fix Attempt** opens against the **Space**'s **Base Branch**. At most one **Fix** per (**Space**, **Sentry Issue**).
 _Avoid_: patch, change, solution
+
+**Escalation**:
+The GitHub issue a **Fix Attempt** opens when the agent concludes the root cause is outside the **Space**'s repo (an external service, a 3rd-party API, a different repository). Filed against the **Space**'s GitHub repo with the `auto-bug-fixer/escalation` label. At most one **Escalation** per (**Space**, **Sentry Issue**) — terminal state for that Fix Attempt.
+_Avoid_: handoff, referral, ticket
 
 **Fix Loop**:
 The per-**Space** polling loop that scans Sentry for unresolved **Sentry Issues** and triggers **Fix Attempts**. Started and stopped independently per **Space** from the UI.

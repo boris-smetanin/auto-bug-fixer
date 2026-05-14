@@ -18,7 +18,7 @@ import {
   hasAttemptForSentryIssue,
   hasInProgressAttempt,
   insertQueuedFixAttempt,
-  resetFailedToInProgress,
+  resetTerminalToInProgress,
 } from './fix-attempts.repository.js';
 
 export class FixAttemptServiceError extends Error {
@@ -100,7 +100,7 @@ export async function retryFixAttempt(
   if (!original || original.spaceId !== space.id) {
     throw new FixAttemptServiceError(404, 'attempt not found');
   }
-  if (original.state !== 'failed') {
+  if (original.state !== 'failed' && original.state !== 'escalated') {
     throw new FixAttemptServiceError(
       409,
       `cannot retry an attempt in state '${original.state}'`,
@@ -144,7 +144,7 @@ export async function retryFixAttempt(
     // non-fatal: drain's writer will create the file if missing
   }
 
-  const retried = resetFailedToInProgress(original.id);
+  const retried = resetTerminalToInProgress(original.id);
   if (!retried) {
     throw new FixAttemptServiceError(500, 'failed to reset attempt to in_progress');
   }
@@ -181,6 +181,7 @@ export {
 export {
   claimNextQueuedForSpace,
   insertQueuedFixAttempt,
+  markFixAttemptEscalated,
   markFixAttemptFailed,
   markFixAttemptPrOpened,
   markOrphanedAttempts,
