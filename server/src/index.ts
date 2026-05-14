@@ -4,9 +4,9 @@ import { cors } from 'hono/cors';
 import type { HealthResponse } from '@abf/shared';
 import { config } from './core/config.js';
 import { closeDb, initDb } from './core/db.js';
-import { startLogCleanupTimer, stopLogCleanupTimer } from './log-cleanup.js';
+import { startLogCleanupTimer, stopLogCleanupTimer } from './settings/settings.service.js';
 import { closeAppLogger, initAppLogger, logEvent } from './core/logger.js';
-import { settingsRouter } from './settings-routes.js';
+import { settingsController } from './settings/settings.controller.js';
 import { logsController } from './logs/logs.controller.js';
 import { fixAttemptsController } from './fix-attempts/fix-attempts.controller.js';
 import { markOrphanedAttempts } from './fix-attempts/fix-attempts.service.js';
@@ -47,7 +47,7 @@ app.route('/api', spacesController);
 app.route('/api', fixAttemptsController);
 app.route('/api', fixLoopController);
 app.route('/api', logsController);
-app.route('/api', settingsRouter);
+app.route('/api', settingsController);
 
 app.get('*', staticHandler(config.webDistPath));
 
