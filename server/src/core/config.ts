@@ -11,5 +11,5 @@ export const config = {
   logsDir: process.env.LOGS_DIR ?? path.join(dataDir, 'logs'),
   corsOrigin: process.env.CORS_ORIGIN ?? '*',
   webDistPath: process.env.WEB_DIST_PATH ?? path.resolve(__dirname, '../../web/dist'),
-  migrationsPath: process.env.MIGRATIONS_PATH ?? path.resolve(__dirname, './migrations'),
+  migrationsPath: process.env.MIGRATIONS_PATH ?? path.resolve(__dirname, '../migrations'),
 };

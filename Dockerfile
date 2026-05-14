@@ -2,7 +2,7 @@
 
 FROM node:22-slim AS build
 RUN apt-get update \
- && apt-get install -y --no-install-recommends python3 build-essential ca-certificates \
+ && apt-get install -y --no-install-recommends python3 build-essential ca-certificates git gosu \
  && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY package.json package-lock.json* ./
@@ -21,6 +21,7 @@ ENV NODE_ENV=production \
     PORT=3000 \
     DATA_DIR=/data \
     CORS_ORIGIN=* \
+    MIGRATIONS_PATH=/app/server/dist/migrations \
     HOME=/home/node
 RUN apt-get update \
  && apt-get install -y --no-install-recommends ca-certificates curl git gosu \

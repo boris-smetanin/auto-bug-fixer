@@ -10,6 +10,7 @@ import { settingsRouter } from './settings-routes.js';
 import { logsRouter } from './spaces/logs-routes.js';
 import { markOrphanedAttempts } from './spaces/fix-attempts.js';
 import { spacesRouter } from './spaces/routes.js';
+import { spacesController } from './spaces/spaces.controller.js';
 import { resumeRunningSpaces, stopAllWorkers } from './spaces/worker.js';
 import { staticHandler } from './core/static.js';
 
@@ -41,6 +42,7 @@ app.use('*', cors({ origin: config.corsOrigin }));
 
 app.get('/healthz', (c) => c.json<HealthResponse>({ ok: true }));
 
+app.route('/api', spacesController);
 app.route('/api', spacesRouter);
 app.route('/api', logsRouter);
 app.route('/api', settingsRouter);

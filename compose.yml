@@ -25,6 +25,7 @@ services:
       context: .
       dockerfile: Dockerfile
       target: build
+    entrypoint: /app/docker-entrypoint.sh
     command: sh -c "npm install && npm run dev:server"
     working_dir: /app
     volumes:
@@ -36,6 +37,8 @@ services:
     env_file:
       - path: .env
         required: false
+    environment:
+      DATA_DIR: /data
     ports:
       - "${PORT:-3000}:${PORT:-3000}"
     restart: unless-stopped
