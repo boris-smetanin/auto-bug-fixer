@@ -1,16 +1,23 @@
 import { spawn } from 'node:child_process';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
 export class GitError extends Error {
   public readonly exitCode: number | null;
   public readonly stderr: string;
-  constructor(message: string, exitCode: number | null, stderr: string) {
+  public readonly aborted: boolean;
+  constructor(
+    message: string,
+    exitCode: number | null,
+    stderr: string,
+    aborted = false,
+  ) {
     super(message);
     this.name = 'GitError';
     this.exitCode = exitCode;
     this.stderr = stderr;
+    this.aborted = aborted;
   }
 }
 
@@ -52,6 +59,7 @@ async function runGit(opts: RunOpts): Promise<{ stdout: string; stderr: string }
     });
     let stdout = '';
     let stderr = '';
+    let aborted = false;
     child.stdout.on('data', (c: Buffer) => {
       stdout += c.toString();
     });
@@ -60,6 +68,7 @@ async function runGit(opts: RunOpts): Promise<{ stdout: string; stderr: string }
     });
 
     const onAbort = (): void => {
+      aborted = true;
       child.kill('SIGTERM');
       setTimeout(() => {
         if (!child.killed) child.kill('SIGKILL');
@@ -73,24 +82,52 @@ async function runGit(opts: RunOpts): Promise<{ stdout: string; stderr: string }
     child.on('error', (err) => {
       opts.signal?.removeEventListener('abort', onAbort);
       if (askpassDir) void rm(askpassDir, { recursive: true, force: true }).catch(() => undefined);
-      reject(new GitError(err.message, null, stderr));
+      reject(new GitError(err.message, null, stderr, aborted));
     });
     child.on('exit', (code) => {
       opts.signal?.removeEventListener('abort', onAbort);
       if (askpassDir) void rm(askpassDir, { recursive: true, force: true }).catch(() => undefined);
-      if (code === 0) {
+      if (code === 0 && !aborted) {
         resolve({ stdout, stderr });
-      } else {
-        reject(
-          new GitError(
-            `git ${opts.args.join(' ')} exited ${code}: ${stderr.trim().slice(0, 500)}`,
-            code,
-            stderr,
-          ),
-        );
+        return;
       }
+      const summary = aborted
+        ? `git ${opts.args.join(' ')} aborted`
+        : `git ${opts.args.join(' ')} exited ${code}: ${stderr.trim().slice(0, 500)}`;
+      reject(new GitError(summary, code, stderr, aborted));
     });
   });
+}
+
+export type CloneOptions = {
+  owner: string;
+  repo: string;
+  token: string;
+  destDir: string;
+  signal?: AbortSignal;
+};
+
+/**
+ * Clone a GitHub repo via HTTPS using a fine-grained PAT, with the token
+ * passed through GIT_ASKPASS so it never appears in the URL, in argv, or in
+ * any persistent git config. On failure (including abort), removes any
+ * partial clone dir.
+ */
+export async function gitClone(opts: CloneOptions): Promise<void> {
+  await mkdir(path.dirname(opts.destDir), { recursive: true });
+
+  const url = `https://github.com/${opts.owner}/${opts.repo}.git`;
+  try {
+    await runGit({
+      cwd: path.dirname(opts.destDir),
+      args: ['clone', '--', url, opts.destDir],
+      token: opts.token,
+      signal: opts.signal,
+    });
+  } catch (err) {
+    await rm(opts.destDir, { recursive: true, force: true }).catch(() => undefined);
+    throw err;
+  }
 }
 
 export async function gitFetch(
