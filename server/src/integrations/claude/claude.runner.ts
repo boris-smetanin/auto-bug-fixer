@@ -1,4 +1,5 @@
 import { query, type SDKResultMessage } from '@anthropic-ai/claude-agent-sdk';
+import { config } from '../../core/config.js';
 
 export const CLAUDE_TIMEOUT_MS = 15 * 60 * 1000;
 
@@ -43,15 +44,27 @@ export class ClaudeRunError extends Error {
 const SYSTEM_PROMPT_TEMPLATE = (baseBranch: string, fixBranch: string): string =>
   [
     'You are fixing a bug reported by Sentry in the repository at the working directory.',
-    `Base branch: ${baseBranch}.`,
-    `You are on branch: ${fixBranch}.`,
+    `Base branch: ${baseBranch}. You are on branch: ${fixBranch}.`,
     '',
-    'Read the stack trace and breadcrumbs in the user message.',
-    'In case Additional Data is provided, use it to understand the context of the bug. It may contain relevant information such as recent code changes, logs, or user actions.', 
-    'Locate the bug.',
-    'Make the smallest fix that resolves it. Do not touch unrelated code.',
-    'Do not run the test suite. Do not push. Do not open a PR — the orchestrator handles that.',
-    'When the fix is ready, commit it via git from the Bash tool with a concise message.',
+    'MANDATORY DISCIPLINE — DO NOT SKIP:',
+    '1. Before ANY code change, invoke the /diagnose skill and apply its discipline.',
+    '2. State at least 3 ranked, falsifiable hypotheses. For each, write the prediction:',
+    '   "If <X> is the cause, then <change Y> will make THIS EXACT Sentry error stop."',
+    '   A hypothesis whose change would NOT alter the visible failure is not a hypothesis —',
+    '   discard or sharpen it. Do not edit code until you have 3.',
+    '3. Verify the top hypothesis by reading the code (Read, Grep, read-only Bash). Trace from',
+    '   the stack trace to the proposed cause and confirm the prediction holds. If you cannot',
+    '   confirm without running code, say so and move to the next hypothesis.',
+    '4. Only after the top hypothesis is verified, make the smallest fix that resolves it.',
+    '   Do not touch unrelated code.',
+    '',
+    'The Sentry payload below contains the stack trace, breadcrumbs, request, contexts, and tags.',
+    'It is the only ground truth for what "the bug" is. The fix must change what THAT payload reports.',
+    '',
+    'Constraints:',
+    '- Do not run the project\'s test suite.',
+    '- Do not push. Do not open a PR — the orchestrator handles that.',
+    '- When the fix is ready, commit it via git from the Bash tool with a concise message.',
   ].join('\n');
 
 export async function runClaudeFix(opts: RunFixOptions): Promise<RunFixResult> {
@@ -99,6 +112,7 @@ export async function runClaudeFix(opts: RunFixOptions): Promise<RunFixResult> {
         allowDangerouslySkipPermissions: true,
         env: scopedEnv,
         systemPrompt: SYSTEM_PROMPT_TEMPLATE(opts.baseBranch, opts.fixBranchName),
+        plugins: [{ type: 'local', path: config.claudePluginPath }],
         abortController,
         settingSources: ['project'],
         persistSession: false,

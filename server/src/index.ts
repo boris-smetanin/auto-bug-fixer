@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
@@ -14,6 +15,12 @@ import { fixLoopController } from './fix-loop/fix-loop.controller.js';
 import { resumeRunningLoops, stopAllLoops } from './fix-loop/fix-loop.service.js';
 import { spacesController } from './spaces/spaces.controller.js';
 import { staticHandler } from './core/static.js';
+
+if (!fs.existsSync(config.claudePluginPath)) {
+  throw new Error(
+    `Claude plugin directory does not exist: ${config.claudePluginPath}. Set CLAUDE_PLUGIN_PATH or rebuild so the plugin tree is copied into dist/.`,
+  );
+}
 
 initDb({ dataDir: config.dataDir, migrationsPath: config.migrationsPath });
 initAppLogger(config.logsDir);
