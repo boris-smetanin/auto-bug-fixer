@@ -47,6 +47,19 @@ export type PullRequestCreated = {
   htmlUrl: string;
 };
 
+/**
+ * Open a PR, or reuse one if it already exists for this head+base. Idempotent
+ * so retrying a Fix Attempt — which force-pushes a new commit onto the same
+ * fix branch — doesn't 422 with "PR already exists" when there's an open PR
+ * from the previous run on the same branch.
+ *
+ * Happy path: POST /pulls succeeds, return the new PR.
+ * Conflict path: POST returns 422, fall back to GET /pulls?head=...&base=...
+ *   - exactly 1 open match → return it (the existing PR now has our fresh
+ *     force-pushed commits)
+ *   - 0 or 2+ matches → surface the original 422 (ambiguity isn't safe to
+ *     resolve automatically)
+ */
 export async function createPullRequest(
   space: Space,
   args: { title: string; body: string; head: string; base: string },
@@ -71,16 +84,59 @@ export async function createPullRequest(
     }),
     signal,
   });
-  if (!res.ok) {
-    const body = await res.text().catch(() => '');
-    throw new GithubApiError(
-      `GitHub ${res.status} creating PR`,
-      res.status,
-      body.slice(0, 500),
-    );
+
+  if (res.ok) {
+    const data = (await res.json()) as { number: number; html_url: string };
+    return { number: data.number, htmlUrl: data.html_url };
   }
-  const data = (await res.json()) as { number: number; html_url: string };
-  return { number: data.number, htmlUrl: data.html_url };
+
+  const body = await res.text().catch(() => '');
+
+  // GitHub returns 422 with a "A pull request already exists ..." message
+  // when an open PR exists for this head+base. Reuse it.
+  if (res.status === 422) {
+    const existing = await findOpenPullRequest(space, args.head, args.base, signal);
+    if (existing) return existing;
+  }
+
+  throw new GithubApiError(
+    `GitHub ${res.status} creating PR`,
+    res.status,
+    body.slice(0, 500),
+  );
+}
+
+async function findOpenPullRequest(
+  space: Space,
+  headBranch: string,
+  base: string,
+  signal?: AbortSignal,
+): Promise<PullRequestCreated | undefined> {
+  const url = new URL(
+    `${GITHUB_API}/repos/${space.githubOwner}/${space.githubRepo}/pulls`,
+  );
+  url.searchParams.set('head', `${space.githubOwner}:${headBranch}`);
+  url.searchParams.set('base', base);
+  url.searchParams.set('state', 'open');
+  url.searchParams.set('per_page', '10');
+
+  const res = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${space.githubToken}`,
+      Accept: 'application/vnd.github+json',
+      'User-Agent': 'auto-bug-fixer',
+      'X-GitHub-Api-Version': '2022-11-28',
+    },
+    signal,
+  });
+  if (!res.ok) return undefined;
+
+  const rows = (await res.json().catch(() => undefined)) as
+    | Array<{ number: number; html_url: string }>
+    | undefined;
+  if (!rows || rows.length !== 1) return undefined;
+  const only = rows[0]!;
+  return { number: only.number, htmlUrl: only.html_url };
 }
 
 export type IssueCreated = {
