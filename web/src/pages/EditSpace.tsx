@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { deleteSpace, getSpace, updateSpace } from '@/lib/api';
+import { parseFieldList } from '@/lib/field-list';
 
 type FormState = {
   name: string;
@@ -20,6 +21,7 @@ type FormState = {
   sentryProjectSlug: string;
   sentryAuthToken: string;
   extraSentryQuery: string;
+  sentryEventFields: string;
   tickIntervalSeconds: string;
 };
 
@@ -49,6 +51,7 @@ export function EditSpace() {
         sentryProjectSlug: s.sentryProjectSlug,
         sentryAuthToken: '',
         extraSentryQuery: s.extraSentryQuery,
+        sentryEventFields: s.sentryEventFields.join(', '),
         tickIntervalSeconds: String(s.tickIntervalSeconds),
       });
     } catch (err) {
@@ -97,6 +100,7 @@ export function EditSpace() {
       sentryProjectSlug: form.sentryProjectSlug.trim() || undefined,
       sentryAuthToken: form.sentryAuthToken || undefined,
       extraSentryQuery: form.extraSentryQuery,
+      sentryEventFields: parseFieldList(form.sentryEventFields),
       tickIntervalSeconds: Number(form.tickIntervalSeconds),
     };
 
@@ -263,6 +267,19 @@ export function EditSpace() {
                 onChange={update('extraSentryQuery')}
                 disabled={submitting}
                 placeholder="level:error environment:production"
+              />
+            </Field>
+
+            <Field
+              label="Additional Sentry event fields"
+              error={errors.sentryEventFields}
+              hint="Comma-separated top-level keys on the Sentry event to surface to the agent."
+            >
+              <Input
+                value={form.sentryEventFields}
+                onChange={update('sentryEventFields')}
+                disabled={submitting}
+                placeholder="extra, breadcrumbs, context"
               />
             </Field>
 

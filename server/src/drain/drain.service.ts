@@ -118,10 +118,11 @@ export async function drainFixAttempt(
     const payload = formatSentryPayload(issue, event, {
       firstEvent,
       suspectCommits,
+      sentryEventFields: space.sentryEventFields,
     });
 
     log.log('info', 'orchestrator', 'sentry payload preview', {
-      preview: payload.slice(0, 2000),
+      preview: payload.slice(0, 10000),
     });
 
     log.log('info', 'orchestrator', 'sentry payload formatted', {

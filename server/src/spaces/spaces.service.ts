@@ -18,6 +18,12 @@ export { setFixLoopRunning } from './spaces.repository.js';
 import { validateCredentials } from './spaces.validators.js';
 import { stopLoop } from '../fix-loop/fix-loop.service.js';
 
+const DEFAULT_SENTRY_EVENT_FIELDS = ['extra', 'breadcrumbs', 'context'];
+
+function defaultedEventFields(input: string[] | undefined): string[] {
+  return input && input.length > 0 ? input : [...DEFAULT_SENTRY_EVENT_FIELDS];
+}
+
 type SpaceServiceErrorInit =
   | { kind: 'errors'; status: 400; errors: ValidationErrors }
   | { kind: 'message'; status: 404 | 409; message: string }
@@ -68,6 +74,7 @@ export async function createSpaceWithEagerClone(
   const name = input.name ?? `${input.githubOwner}/${input.githubRepo}`;
   const tickIntervalSeconds = input.tickIntervalSeconds ?? 60;
   const extraSentryQuery = input.extraSentryQuery ?? '';
+  const sentryEventFields = defaultedEventFields(input.sentryEventFields);
 
   const credErrors = await validateCredentials(
     { ...input, baseBranch, sentryBaseUrl },
@@ -119,6 +126,7 @@ export async function createSpaceWithEagerClone(
       sentryProjectSlug: input.sentryProjectSlug,
       sentryAuthToken: input.sentryAuthToken,
       extraSentryQuery,
+      sentryEventFields,
       tickIntervalSeconds,
     });
   } catch (err) {
@@ -158,6 +166,9 @@ export async function updateSpaceWithReclone(
       typeof body.extraSentryQuery === 'string'
         ? body.extraSentryQuery
         : space.extraSentryQuery,
+    sentryEventFields: Array.isArray(body.sentryEventFields)
+      ? (body.sentryEventFields.filter((s): s is string => typeof s === 'string'))
+      : space.sentryEventFields,
     tickIntervalSeconds:
       body.tickIntervalSeconds === undefined ||
       body.tickIntervalSeconds === null ||
@@ -227,6 +238,7 @@ export async function updateSpaceWithReclone(
     sentryProjectSlug: merged.sentryProjectSlug,
     sentryAuthToken: merged.sentryAuthToken,
     extraSentryQuery: merged.extraSentryQuery ?? '',
+    sentryEventFields: defaultedEventFields(merged.sentryEventFields),
     tickIntervalSeconds: merged.tickIntervalSeconds ?? 60,
   });
 }

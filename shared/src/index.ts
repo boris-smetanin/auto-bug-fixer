@@ -13,6 +13,9 @@ export type SpaceInput = {
   sentryProjectSlug: string;
   sentryAuthToken: string;
   extraSentryQuery?: string;
+  /** Top-level Sentry event field names to extract + render in the agent
+   * payload. Default: ['extra', 'breadcrumbs', 'context']. */
+  sentryEventFields?: string[];
   tickIntervalSeconds?: number;
 };
 
@@ -28,6 +31,7 @@ export type Space = {
   sentryProjectSlug: string;
   sentryAuthToken: string;
   extraSentryQuery: string;
+  sentryEventFields: string[];
   tickIntervalSeconds: number;
   fixLoopRunning: boolean;
   /** Derived: true if any Fix Attempt for this Space is currently in_progress. */
