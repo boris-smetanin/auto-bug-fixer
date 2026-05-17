@@ -39,6 +39,25 @@ export type SentryEvent = {
     headers?: Array<[string, string]>;
     data?: unknown;
   };
+  /**
+   * Sentry's "contexts" — structured, well-known metadata grouped by source
+   * (runtime, os, browser, device, app, plus any custom contexts the SDK
+   * sent). Each context is a free-form object.
+   */
+  contexts?: Record<string, Record<string, unknown> | undefined>;
+  /**
+   * Sentry's "extra" — wholly user-defined key/value bag set via
+   * Sentry.setExtra(). The most situation-specific data.
+   */
+  extra?: Record<string, unknown>;
+};
+
+export type SuspectCommit = {
+  id: string;
+  message: string;
+  authorName?: string;
+  authorEmail?: string;
+  dateCreated?: string;
 };
 
 export class SentryApiError extends Error {
@@ -107,12 +126,13 @@ export async function fetchUnresolvedSentryIssues(
   }));
 }
 
-export async function fetchLatestEventForIssue(
+async function fetchEventByPosition(
   space: Space,
   issueId: string,
+  position: 'latest' | 'oldest',
   signal?: AbortSignal,
 ): Promise<SentryEvent> {
-  const url = `${space.sentryBaseUrl}/api/0/issues/${issueId}/events/latest/`;
+  const url = `${space.sentryBaseUrl}/api/0/issues/${issueId}/events/${position}/`;
   const res = await fetch(url, {
     headers: {
       Authorization: `Bearer ${space.sentryAuthToken}`,
@@ -126,4 +146,70 @@ export async function fetchLatestEventForIssue(
     throw new SentryApiError(`Sentry ${res.status} on ${url}`, res.status, body.slice(0, 500));
   }
   return (await res.json()) as SentryEvent;
+}
+
+export function fetchLatestEventForIssue(
+  space: Space,
+  issueId: string,
+  signal?: AbortSignal,
+): Promise<SentryEvent> {
+  return fetchEventByPosition(space, issueId, 'latest', signal);
+}
+
+export function fetchOldestEventForIssue(
+  space: Space,
+  issueId: string,
+  signal?: AbortSignal,
+): Promise<SentryEvent> {
+  return fetchEventByPosition(space, issueId, 'oldest', signal);
+}
+
+/**
+ * Fetch the suspect commits Sentry has correlated to this issue (via release
+ * tracking + commit data). Best-effort: returns [] if Sentry has nothing or
+ * the endpoint errors (e.g. no commit data uploaded for the release).
+ */
+export async function fetchSuspectCommitsForIssue(
+  space: Space,
+  issueId: string,
+  signal?: AbortSignal,
+): Promise<SuspectCommit[]> {
+  const url = `${space.sentryBaseUrl}/api/0/issues/${issueId}/committers/`;
+  const res = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${space.sentryAuthToken}`,
+      Accept: 'application/json',
+      'User-Agent': 'auto-bug-fixer',
+    },
+    signal,
+  });
+  if (!res.ok) return [];
+
+  const data = (await res.json().catch(() => undefined)) as
+    | {
+        committers?: Array<{
+          author?: { name?: string; email?: string };
+          commits?: Array<{
+            id?: string;
+            message?: string;
+            dateCreated?: string;
+          }>;
+        }>;
+      }
+    | undefined;
+
+  const out: SuspectCommit[] = [];
+  for (const c of data?.committers ?? []) {
+    for (const commit of c.commits ?? []) {
+      if (!commit.id || !commit.message) continue;
+      out.push({
+        id: commit.id,
+        message: commit.message,
+        authorName: c.author?.name,
+        authorEmail: c.author?.email,
+        dateCreated: commit.dateCreated,
+      });
+    }
+  }
+  return out;
 }
