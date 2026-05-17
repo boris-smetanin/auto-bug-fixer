@@ -2,7 +2,7 @@
 
 FROM node:22-slim AS build
 RUN apt-get update \
- && apt-get install -y --no-install-recommends python3 build-essential ca-certificates git gosu \
+ && apt-get install -y --no-install-recommends python3 build-essential ca-certificates git gosu sqlite3 \
  && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY package.json package-lock.json* ./
@@ -24,7 +24,7 @@ ENV NODE_ENV=production \
     MIGRATIONS_PATH=/app/server/dist/migrations \
     HOME=/home/node
 RUN apt-get update \
- && apt-get install -y --no-install-recommends ca-certificates curl git gosu \
+ && apt-get install -y --no-install-recommends ca-certificates curl git gosu sqlite3 \
  && rm -rf /var/lib/apt/lists/* \
  && mkdir -p /data /home/node/.config /home/node/.cache \
  && chown -R node:node /data /home/node

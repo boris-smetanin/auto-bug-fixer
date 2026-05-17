@@ -16,7 +16,8 @@
 # Usage:
 #   cp .env.example .env
 #   docker compose up -d
-#   open http://localhost:${WEB_PORT:-5173}   # Vite dev UI (proxies /api)
+#   open http://localhost:${WEB_PORT:-5173}        # Vite dev UI (proxies /api)
+#   open http://localhost:${SQLITE_WEB_PORT:-8081} # SQLite browser (read-only)
 
 services:
   server:
@@ -67,6 +68,29 @@ services:
       WEB_PORT: ${WEB_PORT:-5173}
     ports:
       - "${WEB_PORT:-5173}:${WEB_PORT:-5173}"
+    depends_on:
+      - server
+    restart: unless-stopped
+
+  # Read-only SQLite browser. Useful for inspecting the app DB during dev
+  # without fighting WAL coordination. Writes are intentionally disabled —
+  # for ad-hoc edits use:  docker compose exec server sqlite3 /data/app.db
+  sqlite-web:
+    container_name: abf-sqlite-web
+    image: coleifer/sqlite-web:latest
+    # Image is published as linux/amd64 only. On Apple Silicon Docker Desktop
+    # runs it under Rosetta — fine for a tiny read-only Python web app.
+    platform: linux/amd64
+    command:
+      - sqlite_web
+      - /data/app.db
+      - --host=0.0.0.0
+      - --port=8080
+      - --read-only
+    volumes:
+      - ./data:/data
+    ports:
+      - "${SQLITE_WEB_PORT:-8081}:8080"
     depends_on:
       - server
     restart: unless-stopped

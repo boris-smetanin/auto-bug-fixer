@@ -92,6 +92,7 @@ All configuration lives in `.env` (auto-loaded by `docker compose`). The full se
 | `ANTHROPIC_API_KEY` | (required) | Claude API key. Passed to the SDK scoped per Fix Attempt. |
 | `PORT` | `3000` | Hono API port (also the host port published by compose). |
 | `WEB_PORT` | `5173` | Vite dev server port (dev compose only). |
+| `SQLITE_WEB_PORT` | `8081` | Read-only SQLite browser port (dev compose only). |
 | `DATA_DIR` | `/data` | Where SQLite, clones, and logs live. Bind-mounted to `./data` on the host. |
 | `CORS_ORIGIN` | `*` | CORS allow-list. |
 
@@ -162,17 +163,19 @@ Two Docker workflows ship:
 
 ### `docker compose up -d` — dev (default)
 
-Two containers:
+Three containers:
 
 - `abf-server` (Hono API) runs `tsx watch` on `${PORT:-3000}`.
 - `abf-web` (Vite dev server with HMR) on `${WEB_PORT:-5173}`. Vite proxies `/api` and `/healthz` to the server container.
-- Source is bind-mounted into both; anonymous volumes keep `node_modules` independent of the host's bindings.
+- `abf-sqlite-web` (read-only DB browser) on `${SQLITE_WEB_PORT:-8081}`. See [Inspecting and editing the database](#inspecting-and-editing-the-database) below.
+- Source is bind-mounted into the app containers; anonymous volumes keep `node_modules` independent of the host's bindings.
 - **Open `http://localhost:5173`** for the UI.
 
 Filtered logs:
 ```bash
 docker compose logs -f server
 docker compose logs -f web
+docker compose logs -f sqlite-web
 ```
 
 ### `docker compose -f compose.prod.yml up -d --build` — production-ish
@@ -190,6 +193,70 @@ DATA_DIR=$PWD/data ANTHROPIC_API_KEY=... npm start
 ```
 
 In dev mode without Docker, `npm run dev` starts both workspaces concurrently.
+
+### Inspecting and editing the database
+
+The app uses **SQLite in WAL mode** (writes go to `app.db-wal` between checkpoints). This makes two things true:
+
+1. The app and a desktop SQL client opening `data/app.db` directly can fight each other — committed writes may not appear in the desktop client, or the client's writes can silently lose to the next container checkpoint.
+2. The right workflow depends on whether you want to *look* or *change* data.
+
+#### Live read-only inspection — `localhost:8081`
+
+The dev compose ships `abf-sqlite-web`, a containerized browser at `http://localhost:${SQLITE_WEB_PORT:-8081}`. It opens the same `data/app.db` the server is using, in read-only mode, so it can show live data without locking conflicts. Use it for:
+
+- browsing rows in a table
+- running ad-hoc `SELECT` queries
+- checking schema + indexes
+- exporting JSON / CSV of result sets
+
+It will **not** let you `INSERT` / `UPDATE` / `DELETE`. That's intentional — concurrent writes from a different process while the server is running corrupt easily.
+
+#### Ad-hoc writes — `docker compose exec`
+
+For one-off edits, run the SQLite CLI *inside the server container*. That way the write goes through the same WAL the app is using, so coherence is guaranteed:
+
+```bash
+# interactive
+docker compose exec server sqlite3 /data/app.db
+
+# one-liner
+docker compose exec server sqlite3 /data/app.db \
+  "UPDATE spaces SET tick_interval_seconds = 30 WHERE id = '<space-id>';"
+
+# bulk SQL from a file (the file lives in the bind-mounted source tree, so /app/<rel-path>)
+docker compose exec server sqlite3 /data/app.db < scripts/some-fixup.sql
+```
+
+Useful one-liners while debugging:
+
+```bash
+# list all Fix Attempts for a Space, newest first
+docker compose exec server sqlite3 -header -column /data/app.db \
+  "SELECT id, state, sentry_issue_id, created_at FROM fix_attempts \
+   WHERE space_id='<space-id>' AND deleted_at IS NULL \
+   ORDER BY created_at DESC LIMIT 20;"
+
+# undo a soft-delete
+docker compose exec server sqlite3 /data/app.db \
+  "UPDATE fix_attempts SET deleted_at = NULL WHERE id = '<fix-attempt-id>';"
+
+# reset a Space's Sentry token after rotation (use the UI for normal updates)
+docker compose exec server sqlite3 /data/app.db \
+  "UPDATE spaces SET sentry_auth_token = '<new-token>' WHERE id = '<space-id>';"
+```
+
+#### Batched manual surgery — stop, edit, start
+
+For multi-statement schema work, the boring-but-safe path: stop the app, do whatever, restart.
+
+```bash
+docker compose stop server          # graceful shutdown checkpoints the WAL
+# now open data/app.db in TablePlus / DBeaver / sqlite3 — exclusive access
+docker compose start server         # picks up your changes on first connect
+```
+
+The web container can keep running during this; only the server holds the DB connection.
 
 ---
 
