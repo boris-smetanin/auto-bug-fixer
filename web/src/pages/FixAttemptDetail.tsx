@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { RotateCcw } from 'lucide-react';
 import type { FixAttempt } from '@abf/shared';
 import { LogLineRow, type LogLine } from '@/components/log-line';
+import { LogViewModeToggle, type LogViewMode } from '@/components/log-view-mode-toggle';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { FixAttemptStatePill } from '@/components/ui/fix-attempt-state-pill';
@@ -20,6 +21,7 @@ export function FixAttemptDetail() {
   }>();
   const [attempt, setAttempt] = useState<FixAttempt | null>(null);
   const [logLines, setLogLines] = useState<LogLine[] | null>(null);
+  const [logViewMode, setLogViewMode] = useState<LogViewMode>('pretty');
   const [error, setError] = useState<string | null>(null);
   const [retryError, setRetryError] = useState<string | null>(null);
   const [retrying, setRetrying] = useState(false);
@@ -130,8 +132,11 @@ export function FixAttemptDetail() {
       {attempt.state === 'failed' && <FailureCard attempt={attempt} />}
 
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <CardTitle className="text-base">Logs</CardTitle>
+          {logLines && logLines.length > 0 && (
+            <LogViewModeToggle value={logViewMode} onChange={setLogViewMode} />
+          )}
         </CardHeader>
         <CardContent>
           {logLines === null && <p className="text-sm text-neutral-500">Loading logs…</p>}
@@ -146,9 +151,16 @@ export function FixAttemptDetail() {
             ))}
           {logLines && logLines.length > 0 && (
             <div className="max-h-[40rem] overflow-y-auto rounded-md border border-neutral-200 bg-neutral-50 p-3 font-mono text-xs leading-relaxed dark:border-neutral-800 dark:bg-neutral-950">
-              {logLines.map((line, i) => (
-                <LogLineRow key={i} line={line} />
-              ))}
+              {logViewMode === 'pretty'
+                ? logLines.map((line, i) => <LogLineRow key={i} line={line} />)
+                : logLines.map((line, i) => (
+                    <div
+                      key={i}
+                      className="select-text whitespace-pre-wrap break-all border-b border-neutral-200/40 px-1 py-0.5 text-[11px] leading-snug text-neutral-700 last:border-0 dark:border-neutral-800/40 dark:text-neutral-300"
+                    >
+                      {JSON.stringify(line)}
+                    </div>
+                  ))}
             </div>
           )}
         </CardContent>
