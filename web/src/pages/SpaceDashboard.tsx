@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { Eye, Play, RotateCcw, Settings } from 'lucide-react';
+import { Eye, Play, RotateCcw, Settings, Trash2 } from 'lucide-react';
 import type { FixAttempt, Space } from '@abf/shared';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,6 +15,7 @@ import {
   getSpace,
   listFixAttempts,
   retryFixAttempt,
+  softDeleteFixAttempt,
   startFixLoop,
   stopFixLoop,
   triggerFixAttempt,
@@ -241,6 +242,8 @@ function FixAttemptsCard({
   const navigate = useNavigate();
   const [retryingId, setRetryingId] = useState<string | null>(null);
   const [retryError, setRetryError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const sentryIssueLink = (issueId: string) =>
     `${space.sentryBaseUrl}/organizations/${space.sentryOrgSlug}/issues/${issueId}/`;
@@ -259,6 +262,25 @@ function FixAttemptsCard({
     }
   };
 
+  const onDelete = async (a: FixAttempt) => {
+    const ok = window.confirm(
+      `Delete this Fix Attempt for Sentry Issue #${a.sentryIssueId}?\n\n` +
+        `The row will be removed from this list, but the GitHub PR (if any) and remote branch are NOT touched — close/delete those manually if you want a clean retry.\n\n` +
+        `After deletion the Fix Loop can attempt this Sentry Issue again on the next tick.`,
+    );
+    if (!ok) return;
+    setDeletingId(a.id);
+    setDeleteError(null);
+    try {
+      await softDeleteFixAttempt(space.id, a.id);
+      onChange();
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -267,6 +289,9 @@ function FixAttemptsCard({
       <CardContent>
         {retryError && (
           <p className="mb-3 text-sm text-red-600">Retry failed: {retryError}</p>
+        )}
+        {deleteError && (
+          <p className="mb-3 text-sm text-red-600">Delete failed: {deleteError}</p>
         )}
         {attempts === null && <p className="text-sm text-neutral-500">Loading…</p>}
         {attempts?.length === 0 && (
@@ -290,7 +315,11 @@ function FixAttemptsCard({
             </thead>
             <tbody>
               {attempts.map((a) => {
-                const busy = retryingId === a.id;
+                const busy = retryingId === a.id || deletingId === a.id;
+                const terminal =
+                  a.state === 'pr_opened' ||
+                  a.state === 'failed' ||
+                  a.state === 'escalated';
                 return (
                   <tr key={a.id} className="border-b border-neutral-100 last:border-0 dark:border-neutral-800">
                     <td className="py-2 pr-4">
@@ -366,6 +395,22 @@ function FixAttemptsCard({
                               </Button>
                             </TooltipTrigger>
                             <TooltipContent>Retry this Fix Attempt</TooltipContent>
+                          </Tooltip>
+                        )}
+                        {terminal && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                aria-label="Delete"
+                                disabled={busy}
+                                onClick={() => void onDelete(a)}
+                              >
+                                <Trash2 className="h-4 w-4 text-neutral-500 hover:text-red-600 dark:text-neutral-400" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Soft-delete (allows the Fix Loop to retry this Sentry Issue)</TooltipContent>
                           </Tooltip>
                         )}
                       </div>

@@ -19,6 +19,7 @@ import {
   hasInProgressAttempt,
   insertQueuedFixAttempt,
   resetTerminalToInProgress,
+  softDeleteFixAttempt as softDeleteFixAttemptInRepo,
 } from './fix-attempts.repository.js';
 
 export class FixAttemptServiceError extends Error {
@@ -159,6 +160,43 @@ export async function retryFixAttempt(
   });
 
   return retried;
+}
+
+/**
+ * Soft-delete a Fix Attempt. Only valid for terminal states (pr_opened,
+ * failed, escalated) — soft-deleting an in-flight row would race the worker.
+ * The row stays in the table as a tombstone; it's hidden from dedup so the
+ * same Sentry Issue can be re-attempted on a future tick. Closing the PR or
+ * deleting the remote branch on GitHub stays the user's responsibility.
+ */
+export function softDeleteFixAttempt(
+  space: { id: string },
+  fixAttemptId: string,
+): void {
+  const original = findFixAttemptById(fixAttemptId);
+  if (!original || original.spaceId !== space.id) {
+    throw new FixAttemptServiceError(404, 'attempt not found');
+  }
+  if (
+    original.state !== 'pr_opened' &&
+    original.state !== 'failed' &&
+    original.state !== 'escalated'
+  ) {
+    throw new FixAttemptServiceError(
+      409,
+      `cannot delete an attempt in state '${original.state}' — only terminal states can be soft-deleted`,
+    );
+  }
+  const deleted = softDeleteFixAttemptInRepo(fixAttemptId);
+  if (!deleted) {
+    // Should never happen given the precheck above, but defensive.
+    throw new FixAttemptServiceError(500, 'soft-delete failed');
+  }
+  logEvent({
+    src: 'orchestrator',
+    msg: 'fix attempt soft-deleted',
+    data: { spaceId: space.id, fixAttemptId, prevState: original.state },
+  });
 }
 
 /**

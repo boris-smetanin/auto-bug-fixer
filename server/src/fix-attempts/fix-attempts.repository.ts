@@ -58,13 +58,17 @@ export function insertQueuedFixAttempt(input: NewFixAttempt): FixAttempt {
   return rowToAttempt(stmt.get(input) as FixAttemptRow);
 }
 
+// Every read filters out soft-deleted rows (deleted_at IS NOT NULL).
+// Tombstones are retained for history but don't participate in dedup,
+// listing, or claim/transition flows.
+
 export function hasAttemptForSentryIssue(
   spaceId: string,
   sentryIssueId: string,
 ): boolean {
   const row = getDb()
     .prepare(
-      'SELECT id FROM fix_attempts WHERE space_id = ? AND sentry_issue_id = ? LIMIT 1',
+      'SELECT id FROM fix_attempts WHERE space_id = ? AND sentry_issue_id = ? AND deleted_at IS NULL LIMIT 1',
     )
     .get(spaceId, sentryIssueId);
   return row !== undefined;
@@ -73,7 +77,7 @@ export function hasAttemptForSentryIssue(
 export function hasInProgressAttempt(spaceId: string): boolean {
   const row = getDb()
     .prepare(
-      "SELECT id FROM fix_attempts WHERE space_id = ? AND state = 'in_progress' LIMIT 1",
+      "SELECT id FROM fix_attempts WHERE space_id = ? AND state = 'in_progress' AND deleted_at IS NULL LIMIT 1",
     )
     .get(spaceId);
   return row !== undefined;
@@ -84,7 +88,7 @@ export function findInProgressAttemptForSpace(
 ): FixAttempt | undefined {
   const row = getDb()
     .prepare(
-      "SELECT * FROM fix_attempts WHERE space_id = ? AND state = 'in_progress' LIMIT 1",
+      "SELECT * FROM fix_attempts WHERE space_id = ? AND state = 'in_progress' AND deleted_at IS NULL LIMIT 1",
     )
     .get(spaceId) as FixAttemptRow | undefined;
   return row ? rowToAttempt(row) : undefined;
@@ -92,7 +96,7 @@ export function findInProgressAttemptForSpace(
 
 export function findFixAttemptById(id: string): FixAttempt | undefined {
   const row = getDb()
-    .prepare('SELECT * FROM fix_attempts WHERE id = ?')
+    .prepare('SELECT * FROM fix_attempts WHERE id = ? AND deleted_at IS NULL')
     .get(id) as FixAttemptRow | undefined;
   return row ? rowToAttempt(row) : undefined;
 }
@@ -100,7 +104,7 @@ export function findFixAttemptById(id: string): FixAttempt | undefined {
 export function listFixAttemptsBySpace(spaceId: string, limit = 50): FixAttempt[] {
   const rows = getDb()
     .prepare(
-      'SELECT * FROM fix_attempts WHERE space_id = ? ORDER BY created_at DESC LIMIT ?',
+      'SELECT * FROM fix_attempts WHERE space_id = ? AND deleted_at IS NULL ORDER BY created_at DESC LIMIT ?',
     )
     .all(spaceId, limit) as FixAttemptRow[];
   return rows.map(rowToAttempt);
@@ -156,7 +160,7 @@ export function resetTerminalToInProgress(id: string): FixAttempt | undefined {
            escalation_issue_url = NULL,
            started_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
            ended_at = NULL
-       WHERE id = ? AND state IN ('failed', 'escalated')
+       WHERE id = ? AND state IN ('failed', 'escalated') AND deleted_at IS NULL
        RETURNING *`,
     )
     .get(id) as FixAttemptRow | undefined;
@@ -224,9 +228,29 @@ export function markOrphanedAttempts(message: string): string[] {
            failure_reason = 'orphaned',
            failure_message = ?,
            ended_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
-       WHERE state IN ('queued', 'in_progress')
+       WHERE state IN ('queued', 'in_progress') AND deleted_at IS NULL
        RETURNING id`,
     )
     .all(message) as { id: string }[];
   return rows.map((r) => r.id);
+}
+
+/**
+ * Soft-delete a Fix Attempt. Allowed only on terminal states (pr_opened,
+ * failed, escalated). Sets deleted_at; row stays in the table for history
+ * but is excluded from dedup, listings, and transition operations.
+ * Returns true if a row was actually soft-deleted, false otherwise (already
+ * deleted, non-terminal state, or not found).
+ */
+export function softDeleteFixAttempt(id: string): boolean {
+  const result = getDb()
+    .prepare(
+      `UPDATE fix_attempts
+       SET deleted_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+       WHERE id = ?
+         AND deleted_at IS NULL
+         AND state IN ('pr_opened', 'failed', 'escalated')`,
+    )
+    .run(id);
+  return result.changes > 0;
 }
