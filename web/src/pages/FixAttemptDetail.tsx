@@ -125,6 +125,8 @@ export function FixAttemptDetail() {
 
       <MetadataCard attempt={attempt} />
 
+      {attempt.state === 'escalated' && <EscalationCard attempt={attempt} />}
+
       {attempt.state === 'failed' && <FailureCard attempt={attempt} />}
 
       <Card>
@@ -162,7 +164,7 @@ function MetadataCard({ attempt }: { attempt: FixAttempt }) {
         <Cell label="Branch">
           <span className="font-mono text-xs">{attempt.branchName}</span>
         </Cell>
-        <Cell label="PR">
+        <Cell label="Outcome">
           {attempt.prNumber && attempt.prUrl ? (
             <a
               href={attempt.prUrl}
@@ -170,7 +172,16 @@ function MetadataCard({ attempt }: { attempt: FixAttempt }) {
               rel="noreferrer"
               className="text-emerald-700 hover:underline dark:text-emerald-400"
             >
-              #{attempt.prNumber}
+              PR #{attempt.prNumber}
+            </a>
+          ) : attempt.escalationIssueNumber && attempt.escalationIssueUrl ? (
+            <a
+              href={attempt.escalationIssueUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="text-orange-700 hover:underline dark:text-orange-400"
+            >
+              Issue #{attempt.escalationIssueNumber}
             </a>
           ) : (
             <span className="text-neutral-400">—</span>
@@ -197,6 +208,34 @@ function Cell({ label, children }: { label: string; children: React.ReactNode })
       <p className="text-xs text-neutral-500 mb-1">{label}</p>
       <div>{children}</div>
     </div>
+  );
+}
+
+function EscalationCard({ attempt }: { attempt: FixAttempt }) {
+  return (
+    <Card className="border-orange-300 dark:border-orange-900">
+      <CardHeader>
+        <CardTitle className="text-base text-orange-700 dark:text-orange-300">
+          Escalated — root cause appears to be outside this repo
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-2 text-sm">
+        <p className="text-neutral-700 dark:text-neutral-300">
+          The agent concluded the failing code is not in this repository and
+          filed a GitHub issue with its diagnostic write-up.
+        </p>
+        {attempt.escalationIssueUrl && (
+          <a
+            href={attempt.escalationIssueUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="text-orange-700 hover:underline dark:text-orange-400 font-medium"
+          >
+            View escalation issue #{attempt.escalationIssueNumber} →
+          </a>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

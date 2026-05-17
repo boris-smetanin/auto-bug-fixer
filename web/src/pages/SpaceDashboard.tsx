@@ -283,7 +283,7 @@ function FixAttemptsCard({
                 <th className="py-2 pr-4 font-medium">State</th>
                 <th className="py-2 pr-4 font-medium">Sentry Issue</th>
                 <th className="py-2 pr-4 font-medium">Branch</th>
-                <th className="py-2 pr-4 font-medium">PR</th>
+                <th className="py-2 pr-4 font-medium">Outcome</th>
                 <th className="py-2 pr-4 font-medium">Created</th>
                 <th className="py-2 pr-4 font-medium text-right">Actions</th>
               </tr>
@@ -317,7 +317,16 @@ function FixAttemptsCard({
                           rel="noreferrer"
                           className="text-emerald-700 hover:underline dark:text-emerald-400"
                         >
-                          #{a.prNumber}
+                          PR #{a.prNumber}
+                        </a>
+                      ) : a.escalationIssueNumber && a.escalationIssueUrl ? (
+                        <a
+                          href={a.escalationIssueUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-orange-700 hover:underline dark:text-orange-400"
+                        >
+                          Issue #{a.escalationIssueNumber}
                         </a>
                       ) : (
                         <span className="text-neutral-400">—</span>
