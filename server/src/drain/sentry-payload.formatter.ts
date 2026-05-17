@@ -20,7 +20,25 @@ export type FormatSentryPayloadOptions = {
   firstEvent?: SentryEvent;
   /** Commits Sentry correlates to this issue (release suspect commits). */
   suspectCommits?: SuspectCommit[];
+  /**
+   * Per-Space configured top-level event field names to render generically
+   * (custom logging-integration data outside Sentry's standard slots).
+   * Fields already handled by dedicated renderers below are skipped to
+   * avoid duplicate output.
+   */
+  sentryEventFields?: string[];
 };
+
+// Fields that already have a dedicated section above — skip them in the
+// configurable "additional sections" loop so they don't render twice.
+const FIELDS_RENDERED_BY_DEDICATED_SECTIONS = new Set([
+  'exception',
+  'breadcrumbs',
+  'request',
+  'contexts',
+  'extra',
+  'tags',
+]);
 
 export function formatSentryPayload(
   issue: SentryIssue,
@@ -143,6 +161,34 @@ export function formatSentryPayload(
     out.push('|---|---|');
     for (const t of tags) {
       out.push(`| ${t.key} | ${t.value} |`);
+    }
+    out.push('');
+  }
+
+  // Configurable additional sections — top-level event fields the user has
+  // declared (per-Space) that fall outside Sentry's standard slots. Useful
+  // for custom logging integrations that write into fields like `context`
+  // (singular) instead of Sentry's standard `extra`.
+  const rawEvent = event as Record<string, unknown>;
+  for (const fieldName of opts.sentryEventFields ?? []) {
+    const key = fieldName.toLowerCase();
+    if (FIELDS_RENDERED_BY_DEDICATED_SECTIONS.has(key)) continue;
+    const value = rawEvent[fieldName];
+    if (value === undefined || value === null) continue;
+    if (typeof value === 'object' && Object.keys(value as object).length === 0) continue;
+
+    out.push(`## ${fieldName}`);
+    out.push('');
+    if (typeof value === 'string') {
+      out.push('```');
+      out.push(truncateValue(value, MAX_EXTRA_VALUE_BYTES));
+      out.push('```');
+    } else if (typeof value === 'object') {
+      for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+        out.push(`- **${k}**: ${truncateValue(v, MAX_EXTRA_VALUE_BYTES)}`);
+      }
+    } else {
+      out.push(String(value));
     }
     out.push('');
   }

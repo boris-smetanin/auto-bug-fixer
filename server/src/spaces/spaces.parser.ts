@@ -63,6 +63,17 @@ export function parseSpaceInput(body: unknown): ParseResult {
     }
   }
 
+  // Accept either a comma-separated string (typical from the form) or a real
+  // array (from API clients). Empty / missing -> undefined; the service
+  // applies the default.
+  let sentryEventFields: string[] | undefined;
+  const rawFields = b.sentryEventFields;
+  if (Array.isArray(rawFields)) {
+    sentryEventFields = normalizeFieldNames(rawFields.filter((s): s is string => typeof s === 'string'));
+  } else if (typeof rawFields === 'string' && rawFields.trim() !== '') {
+    sentryEventFields = normalizeFieldNames(rawFields.split(','));
+  }
+
   if (Object.keys(errors).length > 0) return { ok: false, errors };
 
   return {
@@ -78,7 +89,21 @@ export function parseSpaceInput(body: unknown): ParseResult {
       sentryProjectSlug,
       sentryAuthToken,
       extraSentryQuery,
+      sentryEventFields,
       tickIntervalSeconds,
     },
   };
+}
+
+function normalizeFieldNames(items: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of items) {
+    const trimmed = raw.trim().toLowerCase();
+    if (!trimmed) continue;
+    if (seen.has(trimmed)) continue;
+    seen.add(trimmed);
+    out.push(trimmed);
+  }
+  return out;
 }

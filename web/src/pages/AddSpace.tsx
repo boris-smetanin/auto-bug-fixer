@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { createSpace } from '@/lib/api';
+import { parseFieldList } from '@/lib/field-list';
 import { parseGithubRepoText } from '@/lib/github';
 
 type FormState = {
@@ -21,6 +22,7 @@ type FormState = {
   sentryProjectSlug: string;
   sentryAuthToken: string;
   extraSentryQuery: string;
+  sentryEventFields: string;
   tickIntervalSeconds: string;
 };
 
@@ -35,6 +37,7 @@ const initialForm: FormState = {
   sentryProjectSlug: '',
   sentryAuthToken: '',
   extraSentryQuery: '',
+  sentryEventFields: 'extra, breadcrumbs, context',
   tickIntervalSeconds: '60',
 };
 
@@ -86,6 +89,7 @@ export function AddSpace() {
       sentryProjectSlug: form.sentryProjectSlug.trim(),
       sentryAuthToken: form.sentryAuthToken,
       extraSentryQuery: form.extraSentryQuery.trim() || undefined,
+      sentryEventFields: parseFieldList(form.sentryEventFields),
       tickIntervalSeconds: tick ? Number(tick) : undefined,
     };
 
@@ -293,6 +297,19 @@ export function AddSpace() {
                 value={form.extraSentryQuery}
                 onChange={update('extraSentryQuery')}
                 placeholder="level:error environment:production"
+                disabled={submitting}
+              />
+            </Field>
+
+            <Field
+              label="Additional Sentry event fields"
+              error={errors.sentryEventFields}
+              hint="Comma-separated top-level keys on the Sentry event to surface to the agent. Useful for custom logging integrations writing outside Sentry's standard `extra` field."
+            >
+              <Input
+                value={form.sentryEventFields}
+                onChange={update('sentryEventFields')}
+                placeholder="extra, breadcrumbs, context"
                 disabled={submitting}
               />
             </Field>

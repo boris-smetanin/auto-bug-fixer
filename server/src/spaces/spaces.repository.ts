@@ -13,12 +13,23 @@ type SpaceRow = {
   sentry_project_slug: string;
   sentry_auth_token: string;
   extra_sentry_query: string;
+  sentry_event_fields: string;
   tick_interval_seconds: number;
   fix_loop_running: number;
   created_at: string;
   updated_at: string;
   busy?: number;
 };
+
+function parseEventFields(raw: string): string[] {
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) return parsed.filter((s) => typeof s === 'string');
+  } catch {
+    // fall through
+  }
+  return [];
+}
 
 function rowToSpace(row: SpaceRow): Space {
   return {
@@ -33,6 +44,7 @@ function rowToSpace(row: SpaceRow): Space {
     sentryProjectSlug: row.sentry_project_slug,
     sentryAuthToken: row.sentry_auth_token,
     extraSentryQuery: row.extra_sentry_query,
+    sentryEventFields: parseEventFields(row.sentry_event_fields),
     tickIntervalSeconds: row.tick_interval_seconds,
     fixLoopRunning: row.fix_loop_running === 1,
     busy: row.busy === 1,
@@ -56,16 +68,19 @@ export function insertSpace(s: NewSpace): Space {
     INSERT INTO spaces (
       id, name, github_owner, github_repo, github_token, base_branch,
       sentry_base_url, sentry_org_slug, sentry_project_slug, sentry_auth_token,
-      extra_sentry_query, tick_interval_seconds
+      extra_sentry_query, sentry_event_fields, tick_interval_seconds
     ) VALUES (
       @id, @name, @githubOwner, @githubRepo, @githubToken, @baseBranch,
       @sentryBaseUrl, @sentryOrgSlug, @sentryProjectSlug, @sentryAuthToken,
-      @extraSentryQuery, @tickIntervalSeconds
+      @extraSentryQuery, @sentryEventFields, @tickIntervalSeconds
     )
     RETURNING *
   `);
   // A brand-new Space has no fix_attempts yet, so busy is trivially false.
-  const row = stmt.get(s) as SpaceRow;
+  const row = stmt.get({
+    ...s,
+    sentryEventFields: JSON.stringify(s.sentryEventFields),
+  }) as SpaceRow;
   return rowToSpace({ ...row, busy: 0 });
 }
 
@@ -97,11 +112,16 @@ export function updateSpace(id: string, fields: NewSpace): Space {
         sentry_project_slug = @sentryProjectSlug,
         sentry_auth_token = @sentryAuthToken,
         extra_sentry_query = @extraSentryQuery,
+        sentry_event_fields = @sentryEventFields,
         tick_interval_seconds = @tickIntervalSeconds,
         updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
       WHERE id = @id
     `)
-    .run({ ...fields, id });
+    .run({
+      ...fields,
+      id,
+      sentryEventFields: JSON.stringify(fields.sentryEventFields),
+    });
   // Refetch via findSpaceById to include the derived `busy` column.
   const updated = findSpaceById(id);
   if (!updated) throw new Error(`updateSpace: row ${id} not found after update`);
