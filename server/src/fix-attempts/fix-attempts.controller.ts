@@ -7,6 +7,7 @@ import {
   findFixAttemptById,
   listFixAttemptsBySpace,
   retryFixAttempt,
+  softDeleteFixAttempt,
   triggerManualFixAttempt,
 } from './fix-attempts.service.js';
 
@@ -84,6 +85,21 @@ fixAttemptsController.post('/spaces/:id/fix-attempts/:fid/retry', async (c) => {
   try {
     const retried = await retryFixAttempt(r.space, c.req.param('fid'));
     return c.json(retried);
+  } catch (err) {
+    if (err instanceof FixAttemptServiceError) {
+      return respondWithFixAttemptError(c, err);
+    }
+    throw err;
+  }
+});
+
+fixAttemptsController.delete('/spaces/:id/fix-attempts/:fid', (c) => {
+  const r = lookupSpace(c.req.param('id'));
+  if (!r.ok) return c.json({ error: r.message }, r.status);
+
+  try {
+    softDeleteFixAttempt(r.space, c.req.param('fid'));
+    return c.body(null, 204);
   } catch (err) {
     if (err instanceof FixAttemptServiceError) {
       return respondWithFixAttemptError(c, err);

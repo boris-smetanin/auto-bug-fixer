@@ -115,6 +115,22 @@ export async function retryFixAttempt(
   return res.json() as Promise<FixAttempt>;
 }
 
+export async function softDeleteFixAttempt(
+  spaceId: string,
+  fixAttemptId: string,
+): Promise<void> {
+  const res = await fetch(
+    apiUrl(`/api/spaces/${spaceId}/fix-attempts/${fixAttemptId}`),
+    { method: 'DELETE' },
+  );
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({ error: 'unknown' }))) as {
+      error?: string;
+    };
+    throw new Error(body.error ?? `delete failed: ${res.status}`);
+  }
+}
+
 export async function getFixAttemptLogText(
   spaceId: string,
   fixAttemptId: string,
