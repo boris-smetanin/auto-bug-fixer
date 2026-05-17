@@ -33,7 +33,7 @@ The pull request a successful **Fix Attempt** opens against the **Space**'s **Ba
 _Avoid_: patch, change, solution
 
 **Escalation**:
-The GitHub issue a **Fix Attempt** opens when the agent concludes the root cause is outside the **Space**'s repo (an external service, a 3rd-party API, a different repository). Filed against the **Space**'s GitHub repo with the `auto-bug-fixer/escalation` label. At most one **Escalation** per (**Space**, **Sentry Issue**) — terminal state for that Fix Attempt.
+The GitHub issue a **Fix Attempt** opens when the agent can't safely ship a fix. Two cases qualify: (a) the root cause is outside the **Space**'s repo (external service, 3rd-party API, different repository), or (b) the root cause is here but the correct fix requires architectural changes too large for a single-issue patch, and the only LOC-minimal alternative would be a workaround (deleting a check, swallowing an exception, no-op'ing a feature). Filed against the **Space**'s GitHub repo with the `auto-bug-fixer/escalation` label. At most one **Escalation** per (**Space**, **Sentry Issue**) — terminal state for that Fix Attempt.
 _Avoid_: handoff, referral, ticket
 
 **Fix Loop**:
