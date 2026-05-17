@@ -204,6 +204,7 @@ export function softDeleteFixAttempt(
  * controller). Read-only — these stay direct re-exports of the repo.
  */
 export {
+  countFixAttemptsBySpace,
   findFixAttemptById,
   findInProgressAttemptForSpace,
   hasAttemptForSentryIssue,

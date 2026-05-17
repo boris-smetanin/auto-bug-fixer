@@ -101,13 +101,26 @@ export function findFixAttemptById(id: string): FixAttempt | undefined {
   return row ? rowToAttempt(row) : undefined;
 }
 
-export function listFixAttemptsBySpace(spaceId: string, limit = 50): FixAttempt[] {
+export function listFixAttemptsBySpace(
+  spaceId: string,
+  limit = 50,
+  offset = 0,
+): FixAttempt[] {
   const rows = getDb()
     .prepare(
-      'SELECT * FROM fix_attempts WHERE space_id = ? AND deleted_at IS NULL ORDER BY created_at DESC LIMIT ?',
+      'SELECT * FROM fix_attempts WHERE space_id = ? AND deleted_at IS NULL ORDER BY created_at DESC LIMIT ? OFFSET ?',
     )
-    .all(spaceId, limit) as FixAttemptRow[];
+    .all(spaceId, limit, offset) as FixAttemptRow[];
   return rows.map(rowToAttempt);
+}
+
+export function countFixAttemptsBySpace(spaceId: string): number {
+  const row = getDb()
+    .prepare(
+      'SELECT COUNT(*) AS n FROM fix_attempts WHERE space_id = ? AND deleted_at IS NULL',
+    )
+    .get(spaceId) as { n: number };
+  return row.n;
 }
 
 export function claimFixAttemptById(id: string): FixAttempt | undefined {

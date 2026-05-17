@@ -3,7 +3,6 @@ import type { SSEStreamingApi } from 'hono/streaming';
 import {
   findFixAttemptById,
   findInProgressAttemptForSpace,
-  listFixAttemptsBySpace,
 } from '../fix-attempts/fix-attempts.service.js';
 import { createTailer, type Tailer } from './log-tailer.js';
 
@@ -114,9 +113,8 @@ export async function readHistoricalAttemptLog(
   spaceId: string,
   fixAttemptId: string,
 ): Promise<string | undefined> {
-  const all = listFixAttemptsBySpace(spaceId, 200);
-  const attempt = all.find((a) => a.id === fixAttemptId);
-  if (!attempt) return undefined;
+  const attempt = findFixAttemptById(fixAttemptId);
+  if (!attempt || attempt.spaceId !== spaceId) return undefined;
   try {
     return await fsp.readFile(attempt.logFilePath, 'utf-8');
   } catch {
