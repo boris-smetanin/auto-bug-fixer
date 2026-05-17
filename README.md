@@ -191,6 +191,60 @@ DATA_DIR=$PWD/data ANTHROPIC_API_KEY=... npm start
 
 In dev mode without Docker, `npm run dev` starts both workspaces concurrently.
 
+### Inspecting the database
+
+The app uses SQLite in WAL mode. Querying the file directly from the host while the container is running can see stale data (recent writes sit in `app.db-wal` until a checkpoint). Run queries **through the container** so they go through the same connection path as the app:
+
+```bash
+docker compose exec server sqlite3 /data/app.db "SELECT id, state FROM fix_attempts LIMIT 5;"
+```
+
+The default output is hard to read for wide tables. Two formatting flags worth knowing:
+
+#### `-line` — one field per line (deep inspection of a single row)
+
+Best when you want to see every column of one or two rows without the table wrapping.
+
+```bash
+docker compose exec server sqlite3 -line /data/app.db \
+  "SELECT * FROM fix_attempts WHERE id = '<fix-attempt-id>';"
+```
+
+Output:
+```
+              id = b20c667a-0f98-4e72-b59b-d36080030546
+        space_id = 60255411-cdac-4936-88ed-5c2392253627
+ sentry_issue_id = 13461
+           state = pr_opened
+     branch_name = auto-fix/sentry-13461
+       pr_number = 7
+           ...
+```
+
+#### `-json` — structured output (paste into tools / scripts)
+
+Best when you want to feed the result somewhere else (`jq`, a script, a doc, a chat message).
+
+```bash
+docker compose exec server sqlite3 -json /data/app.db \
+  "SELECT id, state, sentry_issue_id, created_at FROM fix_attempts \
+   WHERE state = 'failed' ORDER BY created_at DESC LIMIT 3;"
+```
+
+Output:
+```json
+[{"id":"...","state":"failed","sentry_issue_id":"13461","created_at":"2026-05-17T15:47:11.234Z"},
+ {"id":"...","state":"failed","sentry_issue_id":"13807","created_at":"2026-05-17T10:21:08.123Z"}]
+```
+
+Pipe through `jq` for further filtering, or `pbcopy` (macOS) to paste it somewhere.
+
+#### Other modes worth knowing about
+
+`sqlite3` also accepts `-box` (unicode-bordered table for multi-row results), `-markdown` (paste straight into a GitHub issue), `-csv`, and `-tabs`. Run `docker compose exec server sqlite3 /data/app.db ".mode"` interactively to see the full list, or `man sqlite3` on the host.
+
+For writes, the same `docker compose exec server sqlite3 …` path works and shares the WAL with the app coherently. For batched manual surgery, prefer `docker compose stop server` → edit → `start` so nothing else is touching the DB while you work.
+
 ---
 
 ## How a Fix Attempt actually runs
