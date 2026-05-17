@@ -12,3 +12,7 @@ data/
 *.log
 .vite/
 .cache/
+
+# Per-developer state, not project artifacts.
+.agents/
+.claude/
