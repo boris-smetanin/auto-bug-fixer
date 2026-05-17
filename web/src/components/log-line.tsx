@@ -21,23 +21,26 @@ export function LogLineRow({ line }: { line: LogLine }) {
 
   return (
     <div className="border-b border-neutral-200/40 last:border-0 dark:border-neutral-800/40">
-      <button
-        type="button"
-        onClick={() => setExpanded((v) => !v)}
-        className="flex w-full cursor-pointer items-start gap-2 rounded px-1 py-1 text-left hover:bg-neutral-100/60 dark:hover:bg-neutral-900/60"
-      >
-        <span className="w-[7rem] shrink-0 text-neutral-400">{time}</span>
-        <span className={cn('w-[6.5rem] shrink-0', srcClass)}>{line.src}</span>
-        <div className="min-w-0 flex-1 whitespace-pre-wrap break-words">
+      <div className="flex items-start gap-2 rounded px-1 py-1 hover:bg-neutral-100/60 dark:hover:bg-neutral-900/60">
+        <span className="w-[7rem] shrink-0 select-text text-neutral-400">{time}</span>
+        <span className={cn('w-[6.5rem] shrink-0 select-text', srcClass)}>{line.src}</span>
+        <div className="min-w-0 flex-1 select-text whitespace-pre-wrap break-words">
           <span className={levelClass}>{line.msg}</span>
           {context && (
             <span className={cn('ml-2 italic', contextClass)}>{context}</span>
           )}
         </div>
-        <Chevron className="h-3.5 w-3.5 shrink-0 text-neutral-400" />
-      </button>
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          aria-label={expanded ? 'Collapse' : 'Expand'}
+          className="shrink-0 cursor-pointer rounded p-0.5 text-neutral-400 hover:bg-neutral-200/60 hover:text-neutral-700 dark:hover:bg-neutral-800/60 dark:hover:text-neutral-200"
+        >
+          <Chevron className="h-3.5 w-3.5" />
+        </button>
+      </div>
       {expanded && (
-        <pre className="mt-1 ml-[7rem] overflow-x-auto rounded bg-neutral-100 p-2 text-[10px] leading-snug text-neutral-700 dark:bg-neutral-900 dark:text-neutral-300">
+        <pre className="mt-1 ml-[7rem] select-text overflow-x-auto rounded bg-neutral-100 p-2 text-[10px] leading-snug text-neutral-700 dark:bg-neutral-900 dark:text-neutral-300">
 {JSON.stringify(line, null, 2)}
         </pre>
       )}
