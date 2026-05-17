@@ -8,7 +8,9 @@ const REDACTED_HEADERS = new Set(['cookie', 'authorization', 'x-api-key']);
 const PII_TAGS = new Set(['user', 'user.id', 'user.email', 'user.ip', 'user.username']);
 // contexts.* keys we never render (PII / not useful to the agent).
 const SKIPPED_CONTEXT_KEYS = new Set(['user']);
-const MAX_BREADCRUMBS = 30;
+// Breadcrumbs tend to repeat (HTTP probes, console noise) — the most recent
+// few are the load-bearing ones for diagnosis.
+const MAX_BREADCRUMBS = 5;
 const MAX_BODY_BYTES = 2048;
 const MAX_EXTRA_VALUE_BYTES = 1024;
 const MAX_CONTEXT_VALUE_BYTES = 256;

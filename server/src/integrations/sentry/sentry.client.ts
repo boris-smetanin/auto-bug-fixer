@@ -126,6 +126,34 @@ export async function fetchUnresolvedSentryIssues(
   }));
 }
 
+type SentryEntry = { type: string; data: unknown };
+type SentryEventRaw = SentryEvent & {
+  entries?: SentryEntry[];
+  user?: unknown;
+};
+
+/**
+ * Sentry's event detail endpoints return exception / breadcrumbs / request
+ * inside an `entries[]` array keyed by `type`, not as top-level fields.
+ * Lift them to the top-level keys the formatter expects, so downstream code
+ * doesn't have to know about both shapes. Also strips the top-level `user`
+ * field — PII we never want to surface to the agent.
+ */
+function normalizeEvent(raw: SentryEventRaw): SentryEvent {
+  for (const entry of raw.entries ?? []) {
+    if (entry.type === 'exception' && !raw.exception) {
+      raw.exception = entry.data as SentryEvent['exception'];
+    } else if (entry.type === 'breadcrumbs' && !raw.breadcrumbs) {
+      raw.breadcrumbs = entry.data as SentryEvent['breadcrumbs'];
+    } else if (entry.type === 'request' && !raw.request) {
+      raw.request = entry.data as SentryEvent['request'];
+    }
+  }
+  delete raw.entries;
+  delete raw.user;
+  return raw;
+}
+
 async function fetchEventByPosition(
   space: Space,
   issueId: string,
@@ -145,7 +173,8 @@ async function fetchEventByPosition(
     const body = await res.text().catch(() => '');
     throw new SentryApiError(`Sentry ${res.status} on ${url}`, res.status, body.slice(0, 500));
   }
-  return (await res.json()) as SentryEvent;
+  const raw = (await res.json()) as SentryEventRaw;
+  return normalizeEvent(raw);
 }
 
 export function fetchLatestEventForIssue(
