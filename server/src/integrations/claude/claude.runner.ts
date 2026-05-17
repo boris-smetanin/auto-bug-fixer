@@ -137,7 +137,7 @@ export async function runClaudeFix(opts: RunFixOptions): Promise<RunFixResult> {
           for (const block of message.message.content) {
             if (block.type === 'text' && typeof block.text === 'string') {
               opts.onLog('info', 'claude assistant text', {
-                text: block.text.slice(0, 500),
+                text: block.text.slice(0, 4000),
               });
             } else if (block.type === 'tool_use') {
               opts.onLog('info', `claude tool: ${block.name}`, {
