@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { LogLineRow, type LogLine } from '@/components/log-line';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { apiUrl } from '@/lib/api';
+import { cn } from '@/lib/utils';
 
 type LogSource = 'orchestrator' | 'claude' | 'subprocess';
 
@@ -22,6 +23,7 @@ export function LiveLogsPanel({ spaceId }: { spaceId: string }) {
     claude: true,
     subprocess: true,
   });
+  const [viewMode, setViewMode] = useState<'pretty' | 'raw'>('pretty');
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const atBottomRef = useRef(true);
@@ -111,6 +113,23 @@ export function LiveLogsPanel({ spaceId }: { spaceId: string }) {
               <span>{s}</span>
             </label>
           ))}
+          <div className="inline-flex overflow-hidden rounded border border-neutral-300 dark:border-neutral-700">
+            {(['pretty', 'raw'] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setViewMode(m)}
+                className={cn(
+                  'px-2 py-0.5 text-xs',
+                  viewMode === m
+                    ? 'bg-neutral-800 text-neutral-50 dark:bg-neutral-200 dark:text-neutral-900'
+                    : 'bg-transparent text-neutral-600 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-900',
+                )}
+              >
+                {m}
+              </button>
+            ))}
+          </div>
         </div>
       </CardHeader>
       <CardContent>
@@ -129,9 +148,16 @@ export function LiveLogsPanel({ spaceId }: { spaceId: string }) {
             {visible.length === 0 && (
               <p className="text-neutral-400">(no lines match the current filters)</p>
             )}
-            {visible.map((line, i) => (
-              <LogLineRow key={i} line={line} />
-            ))}
+            {viewMode === 'pretty'
+              ? visible.map((line, i) => <LogLineRow key={i} line={line} />)
+              : visible.map((line, i) => (
+                  <div
+                    key={i}
+                    className="select-text whitespace-pre-wrap break-all border-b border-neutral-200/40 px-1 py-0.5 text-[11px] leading-snug text-neutral-700 last:border-0 dark:border-neutral-800/40 dark:text-neutral-300"
+                  >
+                    {JSON.stringify(line)}
+                  </div>
+                ))}
           </div>
         )}
       </CardContent>
