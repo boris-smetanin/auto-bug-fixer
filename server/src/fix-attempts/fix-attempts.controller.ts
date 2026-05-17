@@ -4,6 +4,7 @@ import type { Space } from '@abf/shared';
 import { SpaceServiceError, getSpace } from '../spaces/spaces.service.js';
 import {
   FixAttemptServiceError,
+  countFixAttemptsBySpace,
   findFixAttemptById,
   listFixAttemptsBySpace,
   retryFixAttempt,
@@ -38,8 +39,24 @@ function respondWithFixAttemptError(
 fixAttemptsController.get('/spaces/:id/fix-attempts', (c) => {
   const r = lookupSpace(c.req.param('id'));
   if (!r.ok) return c.json({ error: r.message }, r.status);
-  return c.json(listFixAttemptsBySpace(r.space.id));
+  const limit = clampInt(c.req.query('limit'), 20, 1, 100);
+  const offset = clampInt(c.req.query('offset'), 0, 0, Number.MAX_SAFE_INTEGER);
+  const rows = listFixAttemptsBySpace(r.space.id, limit, offset);
+  const total = countFixAttemptsBySpace(r.space.id);
+  return c.json({ rows, total });
 });
+
+function clampInt(
+  raw: string | undefined,
+  fallback: number,
+  min: number,
+  max: number,
+): number {
+  if (raw === undefined) return fallback;
+  const n = Number(raw);
+  if (!Number.isInteger(n)) return fallback;
+  return Math.max(min, Math.min(max, n));
+}
 
 fixAttemptsController.get('/spaces/:id/fix-attempts/:fid', (c) => {
   const r = lookupSpace(c.req.param('id'));

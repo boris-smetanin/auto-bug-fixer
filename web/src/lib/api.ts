@@ -67,10 +67,22 @@ export async function stopFixLoop(id: string): Promise<Space> {
   return res.json() as Promise<Space>;
 }
 
-export async function listFixAttempts(spaceId: string): Promise<FixAttempt[]> {
-  const res = await fetch(apiUrl(`/api/spaces/${spaceId}/fix-attempts`));
+export type FixAttemptsPage = {
+  rows: FixAttempt[];
+  total: number;
+};
+
+export async function listFixAttempts(
+  spaceId: string,
+  limit = 20,
+  offset = 0,
+): Promise<FixAttemptsPage> {
+  const url = new URL(apiUrl(`/api/spaces/${spaceId}/fix-attempts`), window.location.origin);
+  url.searchParams.set('limit', String(limit));
+  url.searchParams.set('offset', String(offset));
+  const res = await fetch(url.toString());
   if (!res.ok) throw new Error(`list fix attempts failed: ${res.status}`);
-  return res.json() as Promise<FixAttempt[]>;
+  return res.json() as Promise<FixAttemptsPage>;
 }
 
 export async function getFixAttempt(

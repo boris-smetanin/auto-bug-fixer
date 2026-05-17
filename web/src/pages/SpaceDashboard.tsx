@@ -28,8 +28,11 @@ export function SpaceDashboard() {
   const { id = '' } = useParams<{ id: string }>();
   const [space, setSpace] = useState<Space | null>(null);
   const [attempts, setAttempts] = useState<FixAttempt[] | null>(null);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const PAGE_SIZE = 20;
 
   const loadSpace = useCallback(async () => {
     try {
@@ -43,12 +46,13 @@ export function SpaceDashboard() {
 
   const loadAttempts = useCallback(async () => {
     try {
-      const rows = await listFixAttempts(id);
-      setAttempts(rows);
+      const result = await listFixAttempts(id, PAGE_SIZE, page * PAGE_SIZE);
+      setAttempts(result.rows);
+      setTotal(result.total);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
-  }, [id]);
+  }, [id, page]);
 
   useEffect(() => {
     void loadSpace();
@@ -153,7 +157,15 @@ export function SpaceDashboard() {
 
       <ManualTriggerCard space={space} onTriggered={loadAttempts} />
 
-      <FixAttemptsCard space={space} attempts={attempts} onChange={loadAttempts} />
+      <FixAttemptsCard
+        space={space}
+        attempts={attempts}
+        total={total}
+        page={page}
+        pageSize={PAGE_SIZE}
+        onPageChange={setPage}
+        onChange={loadAttempts}
+      />
 
       <LiveLogsPanel spaceId={space.id} />
     </main>
@@ -233,10 +245,18 @@ function ManualTriggerCard({
 function FixAttemptsCard({
   space,
   attempts,
+  total,
+  page,
+  pageSize,
+  onPageChange,
   onChange,
 }: {
   space: Space;
   attempts: FixAttempt[] | null;
+  total: number;
+  page: number;
+  pageSize: number;
+  onPageChange: (p: number) => void;
   onChange: () => void;
 }) {
   const navigate = useNavigate();
@@ -420,6 +440,31 @@ function FixAttemptsCard({
               })}
             </tbody>
           </table>
+        )}
+        {attempts && total > pageSize && (
+          <div className="mt-3 flex items-center justify-between text-xs text-neutral-600 dark:text-neutral-400">
+            <span>
+              Showing {page * pageSize + 1}–{Math.min((page + 1) * pageSize, total)} of {total}
+            </span>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={page === 0}
+                onClick={() => onPageChange(page - 1)}
+              >
+                Prev
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={(page + 1) * pageSize >= total}
+                onClick={() => onPageChange(page + 1)}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
         )}
       </CardContent>
     </Card>
