@@ -41,6 +41,16 @@ export class ClaudeRunError extends Error {
   }
 }
 
+function extractResultText(message: SDKResultMessage): string {
+  const candidate = message as unknown as Record<string, unknown>;
+
+  if (typeof candidate.result_text === 'string') return candidate.result_text;
+  if (typeof candidate.error === 'string') return candidate.error;
+  if (typeof candidate.subtype === 'string') return candidate.subtype;
+
+  return JSON.stringify(candidate);
+}
+
 const SYSTEM_PROMPT_TEMPLATE = (baseBranch: string, fixBranch: string): string =>
   [
     'You are fixing a bug reported by Sentry in the repository at the working directory.',
@@ -182,17 +192,20 @@ export async function runClaudeFix(opts: RunFixOptions): Promise<RunFixResult> {
       );
     }
     if (lastResult.is_error) {
-      throw new ClaudeRunError('claude_error', `claude exited with error: ${lastResult.result}`, {
-        result: lastResult.result,
+      const resultText = extractResultText(lastResult);
+      throw new ClaudeRunError('claude_error', `claude exited with error: ${resultText}`, {
+        result: resultText,
       });
     }
+
+    const resultText = extractResultText(lastResult);
 
     return {
       success: true,
       totalCostUsd: lastResult.total_cost_usd,
       numTurns: lastResult.num_turns,
       durationMs: lastResult.duration_ms,
-      resultText: lastResult.result,
+      resultText,
     };
   } catch (err) {
     clearTimeout(timeout);
