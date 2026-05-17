@@ -30,6 +30,8 @@ import { formatPullRequestBody, formatPullRequestTitle } from './pr-body.formatt
 import {
   SentryApiError,
   fetchLatestEventForIssue,
+  fetchOldestEventForIssue,
+  fetchSuspectCommitsForIssue,
   fetchUnresolvedSentryIssues,
 } from '../integrations/sentry/sentry.client.js';
 import { formatSentryPayload } from './sentry-payload.formatter.js';
@@ -94,9 +96,29 @@ export async function drainFixAttempt(
         '',
       );
     }
-    const event = await fetchLatestEventForIssue(space, attempt.sentryIssueId);
+    // Latest event is load-bearing — failure here aborts the Fix Attempt.
+    // First event + suspect commits are best-effort enrichment; failures get
+    // logged and the run continues without them.
+    const [event, firstEvent, suspectCommits] = await Promise.all([
+      fetchLatestEventForIssue(space, attempt.sentryIssueId),
+      fetchOldestEventForIssue(space, attempt.sentryIssueId).catch((err) => {
+        log.log('warn', 'orchestrator', 'fetch first event failed (non-fatal)', {
+          error: err instanceof Error ? err.message : String(err),
+        });
+        return undefined;
+      }),
+      fetchSuspectCommitsForIssue(space, attempt.sentryIssueId).catch((err) => {
+        log.log('warn', 'orchestrator', 'fetch suspect commits failed (non-fatal)', {
+          error: err instanceof Error ? err.message : String(err),
+        });
+        return [];
+      }),
+    ]);
 
-    const payload = formatSentryPayload(issue, event);
+    const payload = formatSentryPayload(issue, event, {
+      firstEvent,
+      suspectCommits,
+    });
     log.log('info', 'orchestrator', 'sentry payload formatted', {
       payloadLength: payload.length,
     });
