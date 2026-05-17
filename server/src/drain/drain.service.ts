@@ -119,6 +119,11 @@ export async function drainFixAttempt(
       firstEvent,
       suspectCommits,
     });
+
+    log.log('info', 'orchestrator', 'sentry payload preview', {
+      preview: payload.slice(0, 2000),
+    });
+
     log.log('info', 'orchestrator', 'sentry payload formatted', {
       payloadLength: payload.length,
     });
